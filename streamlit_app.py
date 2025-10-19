@@ -75,7 +75,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Título principal
-st.markdown('<h1 class="main-header">📊 Dashboard de Produtividade - Time de TI</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">📊 Dashboard Produtividade - Produto SAI </h1>', unsafe_allow_html=True)
 
 # Prazo estabelecido pela gestão (48 horas = 2 dias)
 PRAZO_GESTAO = 2
@@ -148,6 +148,89 @@ def get_unique_sorted(series):
     except:
         return []
 
+# Filtro por DATA - VERSÃO CORRIGIDA
+st.sidebar.markdown("---")
+st.sidebar.subheader("📅 Filtro por Período")
+
+# Verifica quais colunas de data existem no DataFrame
+colunas_data_disponiveis = []
+nomes_possiveis = ['data abertura', 'data entrega', 'data_abertura', 'data_entrega', 
+                   'Data Abertura', 'Data Entrega', 'data', 'Data', 'Data de Abertura', 'Data de Entrega']
+
+for nome in nomes_possiveis:
+    if nome in df.columns:
+        colunas_data_disponiveis.append(nome)
+
+if colunas_data_disponiveis:
+    # Se encontrou colunas de data, permite escolher
+    if len(colunas_data_disponiveis) > 1:
+        coluna_data = st.sidebar.selectbox(
+            "Selecionar coluna para filtro:",
+            colunas_data_disponiveis,
+            help="Escolha qual coluna de data usar como referência"
+        )
+    else:
+        coluna_data = colunas_data_disponiveis[0]
+        st.sidebar.write(f"**Usando coluna:** {coluna_data}")
+    
+    # Agora processa a coluna selecionada
+    try:
+        df[coluna_data] = pd.to_datetime(df[coluna_data], errors='coerce')
+        datas_validas = df[coluna_data].dropna()
+        
+        if not datas_validas.empty:
+            data_min = datas_validas.min().date()
+            data_max = datas_validas.max().date()
+            
+            st.sidebar.write(f"Período disponível: {data_min} a {data_max}")
+            
+            # Seleção de período
+            data_inicio = st.sidebar.date_input(
+                "Data de início:",
+                value=data_min,
+                min_value=data_min,
+                max_value=data_max
+            )
+            
+            data_fim = st.sidebar.date_input(
+                "Data de fim:",
+                value=data_max,
+                min_value=data_min,
+                max_value=data_max
+            )
+            
+            # Garante que a data início seja menor que data fim
+            if data_inicio > data_fim:
+                st.sidebar.error("❌ Data de início não pode ser maior que data de fim")
+                data_inicio, data_fim = data_min, data_max
+                
+            periodo_selecionado = True
+            
+        else:
+            st.sidebar.warning("⚠️ Não há datas válidas para filtrar")
+            periodo_selecionado = False
+            data_inicio, data_fim = None, None
+            
+    except Exception as e:
+        st.sidebar.error(f"❌ Erro ao processar datas: {e}")
+        periodo_selecionado = False
+        data_inicio, data_fim = None, None
+        
+else:
+    # Se não encontrou nenhuma coluna de data conhecida
+    st.sidebar.warning("""
+    ⚠️ Nenhuma coluna de data encontrada. 
+    Colunas disponíveis serão mostradas abaixo.
+    """)
+    periodo_selecionado = False
+    data_inicio, data_fim = None, None
+
+st.sidebar.markdown("---")
+    
+# Filtro por SPRINT (NOVO)
+sprints = ['Todos'] + get_unique_sorted(df['Sprint'])
+sprint_selecionada = st.sidebar.selectbox("Selecione a Sprint:", sprints)
+
 # Filtro por responsável
 responsaveis_base = get_unique_sorted(df['Responsável'])
 if 'Sem Responsável' not in responsaveis_base:
@@ -184,8 +267,26 @@ st.sidebar.markdown(f"**⚠️ Sem Responsável:** {atividades_sem_responsavel}"
 ultima_atualizacao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 st.sidebar.markdown(f"**🕒 Última atualização:** {ultima_atualizacao}")
 
+
 # Aplicar filtros
 df_filtrado = df.copy()
+
+# Filtro por PERÍODO (USANDO A COLUNA SELECIONADA)
+if periodo_selecionado and data_inicio and data_fim:
+    try:
+        mask_periodo = (df_filtrado[coluna_data].dt.date >= data_inicio) & (df_filtrado[coluna_data].dt.date <= data_fim)
+        df_filtrado = df_filtrado[mask_periodo]
+        
+        # Verifica se há dados após o filtro de período
+        if df_filtrado.empty:
+            st.warning("📭 Não há dados registrados no período selecionado. Atualize o filtro.")
+    except Exception as e:
+        st.error(f"Erro ao filtrar por período: {e}")
+
+# Filtro por sprint (NOVO)
+if sprint_selecionada != 'Todos':
+    df_filtrado = df_filtrado[df_filtrado['Sprint'] == sprint_selecionada]
+
 if responsavel_selecionado != 'Todos':
     if responsavel_selecionado == 'Sem Responsável':
         df_filtrado = df_filtrado[df_filtrado['Responsável'] == 'Sem Responsável']
@@ -210,8 +311,8 @@ if total_concluidas > 0:
     dentro_prazo = len(df_concluidas_filtrado[df_concluidas_filtrado['Cumpriu Prazo'] == 'Dentro do Prazo'])
     fora_prazo = len(df_concluidas_filtrado[df_concluidas_filtrado['Cumpriu Prazo'] == 'Fora do Prazo'])
     
-    taxa_dentro_prazo = (dentro_prazo / total_concluidas) * 100
-    taxa_fora_prazo = (fora_prazo / total_concluidas) * 100
+    taxa_dentro_prazo = (dentro_prazo / total_concluidas) * 100 if total_concluidas > 0 else 0
+    taxa_fora_prazo = (fora_prazo / total_concluidas) * 100 if total_concluidas > 0 else 0
     
     st.sidebar.markdown(f"**✅ Dentro do prazo:** {dentro_prazo} ({taxa_dentro_prazo:.1f}%)")
     st.sidebar.markdown(f"**❌ Fora do prazo:** {fora_prazo} ({taxa_fora_prazo:.1f}%)")
@@ -260,7 +361,7 @@ with col5:
 # Banner informativo sobre o prazo
 st.markdown(f"""
 <div style="background-color: #e3f2fd; padding: 1rem; border-radius: 10px; border-left: 4px solid #2196f3; margin: 1rem 0;">
-    <h4 style="margin: 0; color: #1976d2;">⏰ Prazo Estabelecido pela Gestão: {PRAZO_GESTAO} dias (48 horas)</h4>
+    <h4 style="margin: 0; color: #1976d2;">⏰ Prazo Médio Estabelecido pela Gestão: {PRAZO_GESTAO} dias (48 horas)</h4>
     <p style="margin: 0.5rem 0 0 0; color: #1565c0;">
         Esta métrica considera apenas atividades <strong>concluídas</strong> com tempo de entrega calculado.
     </p>
@@ -319,7 +420,6 @@ with tab2:
     
     # Adicionar análise de prazo por responsável
     prazo_por_responsavel = []
-    falhas_por_responsavel = []
     atividades_com_falha_detalhes = []
     
     for responsavel in resp_analysis.index:
@@ -337,12 +437,6 @@ with tab2:
         
         # Análise de falhas
         atividades_com_falha = df_resp[df_resp['Falha/ Teste em Produção'] == 'Sim']
-        if len(df_resp) > 0:
-            taxa_falhas = (len(atividades_com_falha) / len(df_resp)) * 100
-        else:
-            taxa_falhas = 0
-            
-        falhas_por_responsavel.append(taxa_falhas)
         
         # Detalhes das atividades com falha
         for idx, atividade in atividades_com_falha.iterrows():
@@ -353,11 +447,12 @@ with tab2:
                 'Módulo': atividade['Módulo'],
                 'Tempo Entrega (dias)': atividade.get('Tempo Entrega (dias)', 'N/A'),
                 'Status': atividade['Status']
-            })
-    
+            })         
+      
+        
+   
     resp_analysis['Dentro Prazo (%)'] = prazo_por_responsavel
-    resp_analysis['Taxa Falhas (%)'] = falhas_por_responsavel
-    resp_analysis.columns = ['Total Atividades', 'Tempo Médio (dias)', 'Taxa Falhas Base (%)', 'Dentro Prazo (%)', 'Taxa Falhas (%)']
+    resp_analysis.columns = ['Total Atividades', 'Tempo Médio (dias)', 'Taxa Falhas (%)', 'Dentro Prazo (%)']
     resp_analysis = resp_analysis.sort_values('Total Atividades', ascending=False)
     
     st.dataframe(resp_analysis, use_container_width=True)
@@ -397,10 +492,12 @@ with tab2:
     col1, col2 = st.columns(2)
     
     with col1:
+        
         # Tempo médio por responsável (apenas concluídas)
         df_concluidas = df_filtrado[df_filtrado['Status'] == 'Concluída']
         if not df_concluidas.empty and 'Tempo Entrega (dias)' in df_concluidas.columns:
             tempo_resp = df_concluidas.groupby('Responsável')['Tempo Entrega (dias)'].mean().sort_values()
+            
             fig_tempo_resp = px.bar(tempo_resp, orientation='h',
                                   title='Tempo Médio por Responsável (dias)',
                                   color=tempo_resp.values,
@@ -416,12 +513,27 @@ with tab2:
     with col2:
         # Cumprimento de prazo por responsável
         if total_concluidas > 0:
-            prazo_resp = resp_analysis[['Dentro Prazo (%)']].sort_values('Dentro Prazo (%)')
-            fig_prazo_resp = px.bar(prazo_resp, orientation='h',
-                                  title=f'% Dentro do Prazo por Responsável ({PRAZO_GESTAO} dias)',
-                                  color=prazo_resp['Dentro Prazo (%)'],
-                                  color_continuous_scale='RdYlGn')
-            st.plotly_chart(fig_prazo_resp, use_container_width=True)
+            prazo_resp = resp_analysis[resp_analysis['Total Atividades'] > 0][['Dentro Prazo (%)']]
+            prazo_resp = prazo_resp.sort_values('Dentro Prazo (%)', ascending=True)  # Do menor para o maior
+
+            if not prazo_resp.empty:
+
+                fig_prazo_resp = px.bar(prazo_resp, 
+                                x=prazo_resp.index,
+                                y='Dentro Prazo (%)',
+                                title=f'% Dentro do Prazo por Responsável ({PRAZO_GESTAO} dias)',
+                                color='Dentro Prazo (%)',
+                                color_continuous_scale='RdYlGn')
+                        
+                fig_prazo_resp.update_layout(xaxis_tickangle=-45,
+                                         yaxis_range=[0, 100])  # Forçar escala de 0-100%
+                fig_prazo_resp.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
+
+                st.plotly_chart(fig_prazo_resp, use_container_width=True)
+            else:
+                st.info("📊 Não há dados de prazo para exibir")
+        else:
+            st.info("📊 Nenhuma atividade concluída para análise de prazos")
 
 with tab3:
     st.subheader("Análise por Módulo")
@@ -476,12 +588,26 @@ with tab3:
     with col2:
         # Cumprimento de prazo por módulo
         if total_concluidas > 0:
-            prazo_modulo = modulo_analysis[['Dentro Prazo (%)']].sort_values('Dentro Prazo (%)')
-            fig_prazo_modulo = px.bar(prazo_modulo, orientation='h',
-                                    title=f'% Dentro do Prazo por Módulo ({PRAZO_GESTAO} dias)',
-                                    color=prazo_modulo['Dentro Prazo (%)'],
-                                    color_continuous_scale='RdYlGn')
-            st.plotly_chart(fig_prazo_modulo, use_container_width=True)
+            prazo_mod = modulo_analysis[modulo_analysis['Total'] > 0][['Dentro Prazo (%)']]
+            prazo_mod = prazo_mod.sort_values('Dentro Prazo (%)', ascending=True)  # Do menor para o maior
+
+            if not prazo_mod.empty:
+                fig_prazo_mod = px.bar(prazo_mod,
+                                       x=prazo_mod.index,
+                                       y='Dentro Prazo (%)',
+                                       title=f'% Dentro do Prazo por Módulo ({PRAZO_GESTAO} dias)',
+                                       color='Dentro Prazo (%)',
+                                       color_continuous_scale='RdYlGn')
+                
+                fig_prazo_mod.update_layout(xaxis_tickangle=-45,
+                                            yaxis_range=[0, 100])
+                fig_prazo_mod.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
+
+                st.plotly_chart(fig_prazo_mod, use_container_width=True)
+            else:
+                st.info("📊 Não há dados de prazo por módulo para exibir")
+        else:
+            st.info("📊 Nenhuma atividade concluída para análise de prazos por módulo")                            
 
 with tab4:
     st.subheader("Timeline e Evolução")
@@ -500,37 +626,114 @@ with tab4:
 with tab5:
     st.subheader("⏰ Análise Detalhada de Prazos")
     
-    col1, col2 = st.columns(2)
+    # Adiciona CSS para cores consistentes
+    st.markdown("""
+    <style>
+    .on-time-card {
+        background-color: #f0f9f0;
+        border: 1px solid #4CAF50;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        color: #2e7d32;
+    }
+    .late-card {
+        background-color: #fff3e0;
+        border: 1px solid #FF9800;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        color: #e65100;
+    }
+    .slow-activity {
+        background-color: #ffebee;
+        border: 1px solid #f44336;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        color: #c62828;
+    }
+    .fast-activity {
+        background-color: #e8f5e8;
+        border: 1px solid #66bb6a;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        color: #2e7d32;
+    }
+    @media (prefers-color-scheme: dark) {
+        .on-time-card {
+            background-color: #1b5e20;
+            border-color: #4CAF50;
+            color: #a5d6a7;
+        }
+        .late-card {
+            background-color: #e65100;
+            border-color: #FF9800;
+            color: #ffe0b2;
+        }
+        .slow-activity {
+            background-color: #b71c1c;
+            border-color: #f44336;
+            color: #ffcdd2;
+        }
+        .fast-activity {
+            background-color: #1b5e20;
+            border-color: #66bb6a;
+            color: #c8e6c9;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
-    with col1:
-        st.markdown("### 📊 Estatísticas de Prazo")
+    # CARDS NO TOPO - SEM DIVIDIR ESPAÇO
+    st.markdown("### 📊 Estatísticas de Prazo")
+    
+    if total_concluidas > 0:
+        # Cálculo dinâmico
+        dentro_prazo_correto = len(df_concluidas_filtrado[df_concluidas_filtrado['Cumpriu Prazo'] == 'Dentro do Prazo'])
+        fora_prazo_correto = len(df_concluidas_filtrado[df_concluidas_filtrado['Cumpriu Prazo'] == 'Fora do Prazo'])
+        taxa_dentro_correta = (dentro_prazo_correto / total_concluidas) * 100
+        taxa_fora_correta = (fora_prazo_correto / total_concluidas) * 100
         
+        # Cards lado a lado no topo
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown(f"""
+            <div class="on-time-card">
+                <h4 style="margin:0; color: inherit;">✅ Dentro do Prazo ({PRAZO_GESTAO} dias)</h4>
+                <p style="margin:5px 0; font-size: 1.2em;"><strong>{dentro_prazo_correto} atividades</strong> ({taxa_dentro_correta:.1f}%)</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div class="late-card">
+                <h4 style="margin:0; color: inherit;">❌ Fora do Prazo ({PRAZO_GESTAO} dias)</h4>
+                <p style="margin:5px 0; font-size: 1.2em;"><strong>{fora_prazo_correto} atividades</strong> ({taxa_fora_correta:.1f}%)</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # CONTEÚDO ABAIXO DOS CARDS (agora em colunas separadas)
+    st.markdown("---")
+    
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        # Distribuição de tempos
+        st.markdown("### 📈 Distribuição dos Tempos de Entrega")
         if total_concluidas > 0:
-            # Métricas detalhadas
-            st.markdown(f"""
-            <div class="on-time">
-                <h4>✅ Dentro do Prazo ({PRAZO_GESTAO} dias)</h4>
-                <p><strong>{dentro_prazo} atividades</strong> ({taxa_dentro_prazo:.1f}%)</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class="late">
-                <h4>❌ Fora do Prazo ({PRAZO_GESTAO} dias)</h4>
-                <p><strong>{fora_prazo} atividades</strong> ({taxa_fora_prazo:.1f}%)</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Distribuição de tempos
-            st.markdown("### 📈 Distribuição dos Tempos de Entrega")
             fig_dist_tempo = px.histogram(df_concluidas_filtrado, x='Tempo Entrega (dias)',
                                         title='Distribuição dos Tempos de Entrega',
-                                        nbins=20)
-            fig_dist_tempo.add_vline(x=PRAZO_GESTAO, line_dash="dash", line_color="red",
+                                        nbins=20,
+                                        color_discrete_sequence=['#4285f4'])
+            fig_dist_tempo.add_vline(x=PRAZO_GESTAO, line_dash="dash", line_color="#FF6B6B",
                                    annotation_text=f"Prazo: {PRAZO_GESTAO}d")
+            fig_dist_tempo.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_dist_tempo, use_container_width=True)
-        
-    with col2:
+    
+    with col4:
         st.markdown("### 🐌 Top 5 Atividades Mais Atrasadas")
         
         if total_concluidas > 0:
@@ -541,10 +744,10 @@ with tab5:
                     dias_atraso = atividade['Tempo Entrega (dias)'] - PRAZO_GESTAO
                     st.markdown(f"""
                     <div class="slow-activity">
-                        <strong>+{dias_atraso:.0f} dias de atraso</strong><br>
+                        <strong style="color: inherit;">+{dias_atraso:.0f} dias de atraso</strong><br>
                         <strong>ID:</strong> {atividade['ID']} | <strong>Responsável:</strong> {atividade['Responsável']}<br>
                         <strong>Módulo:</strong> {atividade['Módulo']}<br>
-                        <strong>Tempo total:</strong> {atividade['Tempo Entrega (dias)']} dias<br>
+                        <strong>Tempo total:</strong> {atividade['Tempo Entrega (dias)']:.1f} dias<br>
                         {atividade['Atividade'][:80]}...
                     </div>
                     """, unsafe_allow_html=True)
@@ -557,11 +760,12 @@ with tab5:
             for idx, atividade in atividades_rapidas.iterrows():
                 st.markdown(f"""
                 <div class="fast-activity">
-                    <strong>{atividade['Tempo Entrega (dias)']} dias</strong><br>
+                    <strong style="color: inherit;">{atividade['Tempo Entrega (dias)']:.1f} dias</strong><br>
                     <strong>ID:</strong> {atividade['ID']} | <strong>Responsável:</strong> {atividade['Responsável']}<br>
                     {atividade['Atividade'][:60]}...
                 </div>
-                """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)             
+      
 
 with tab6:
     st.subheader("🚨 Insights e Recomendações")
@@ -571,78 +775,109 @@ with tab6:
     
     with col1:
         st.markdown("### 📋 Insights de Performance")
+          
+    if total_concluidas > 0:
+        # EXCLUIR "Sem Responsável" da análise - FILTRO ADICIONADO
+        resp_analysis_filtrado = resp_analysis[
+            (resp_analysis['Total Atividades'] > 0) & 
+            (resp_analysis.index != 'Sem Responsável')  # ✅ EXCLUI SEM RESPONSÁVEL
+        ]
         
-        if total_concluidas > 0:
-            # Responsável com melhor performance no prazo
-            melhor_prazo_resp = resp_analysis[resp_analysis['Total Atividades'] > 0].nlargest(1, 'Dentro Prazo (%)')
-            if not melhor_prazo_resp.empty:
-                resp, dados = list(melhor_prazo_resp.iterrows())[0]
-                st.success(f"**🏆 Melhor no prazo:** {resp} - {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
-            
-            # Módulo com melhor performance no prazo
-            melhor_prazo_mod = modulo_analysis[modulo_analysis['Total'] > 0].nlargest(1, 'Dentro Prazo (%)')
-            if not melhor_prazo_mod.empty:
-                mod, dados = list(melhor_prazo_mod.iterrows())[0]
-                st.info(f"**🔧 Módulo mais eficiente:** {mod} - {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
-            
-            # Identificar problemas
-            if taxa_fora_prazo > 50:
-                st.error(f"**⚠️ Atenção:** Mais de 50% das atividades estão fora do prazo!")
-            elif taxa_fora_prazo > 30:
-                st.warning(f"**📊 Observação:** {taxa_fora_prazo:.1f}% das atividades estão fora do prazo")
-            else:
-                st.success(f"**✅ Excelente:** Apenas {taxa_fora_prazo:.1f}% das atividades estão fora do prazo")
+        # Três responsáveis com performance mais baixa (mais lentos)
+        piores_prazo_resp = resp_analysis_filtrado.nsmallest(3, 'Dentro Prazo (%)') 
+
+        if not piores_prazo_resp.empty:
+            st.warning("**🐌 Maiores dificuldades com prazos:**")
+
+            for idx, (resp, dados) in enumerate(piores_prazo_resp.iterrows(), 1):
+                emoji = "🥉" if idx == 3 else "🥈" if idx == 2 else "🥇"
+                st.write(f"{emoji} **{idx}º {resp}** - {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
+
+                # Mostra estatísticas detalhadas
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total", int(dados['Total Atividades']))
+                with col2:
+                    dentro_prazo_qtd = int(dados['Total Atividades'] * (dados['Dentro Prazo (%)'] / 100))
+                    st.metric("Dentro Prazo", dentro_prazo_qtd)
+                with col3:
+                    fora_prazo_qtd = int(dados['Total Atividades'] - dentro_prazo_qtd)
+                    st.metric("Fora Prazo", fora_prazo_qtd)
+
+                st.markdown("---")
+        else:
+            st.info("📊 Não há responsáveis com dados suficientes para análise")
+
+    else:
+        st.info("📊 Dados insuficientes para análise de performance")
+
+    # Módulo com melhor performance no prazo (mantido igual)
+    melhor_prazo_mod = modulo_analysis[modulo_analysis['Total'] > 0].nlargest(1, 'Dentro Prazo (%)')
+    if not melhor_prazo_mod.empty:
+        mod, dados = list(melhor_prazo_mod.iterrows())[0]
+        st.info(f"**🔧 Módulo mais eficiente:** {mod} - {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
     
-    with col2:
-        st.markdown("### 💡 Recomendações")
-        
-        recomendacoes = []
-        
-        if total_concluidas > 0:
-            if taxa_fora_prazo > 40:
-                recomendacoes.append("**🔴 Prioridade:** Revisar processos que estão causando atrasos frequentes")
-            
-            if atividades_sem_responsavel > 0:
-                recomendacoes.append(f"**👥 Atribuição:** {atividades_sem_responsavel} atividades sem responsável precisam ser atribuídas")
-            
-            # Verificar responsáveis com baixa performance no prazo
-            resp_baixa_performance = resp_analysis[
-                (resp_analysis['Total Atividades'] >= 3) & 
-                (resp_analysis['Dentro Prazo (%)'] < 50)
-            ]
-            if not resp_baixa_performance.empty:
-                for resp, dados in resp_baixa_performance.iterrows():
-                    recomendacoes.append(f"**🎯 Treinamento:** {resp} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
-            
-            # Verificar módulos problemáticos
-            mod_problematicos = modulo_analysis[
-                (modulo_analysis['Total'] >= 5) & 
-                (modulo_analysis['Dentro Prazo (%)'] < 40)
-            ]
-            if not mod_problematicos.empty:
-                for mod, dados in mod_problematicos.iterrows():
-                    recomendacoes.append(f"**🔧 Otimização:** Módulo {mod} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
-            
-            # NOVAS RECOMENDAÇÕES BASEADAS EM FALHAS
-            if atividades_com_falha_total > 0:
-                recomendacoes.append(f"**🔴 Qualidade:** {atividades_com_falha_total} atividades tiveram falha - revisar processos de teste")
-            
-            # Responsáveis com alta taxa de falhas
-            resp_alta_falhas = resp_analysis[
-                (resp_analysis['Total Atividades'] >= 3) & 
-                (resp_analysis['Taxa Falhas (%)'] > 20)
-            ]
-            if not resp_alta_falhas.empty:
-                for resp, dados in resp_alta_falhas.iterrows():
-                    recomendacoes.append(f"**🧪 Testes:** {resp} tem {dados['Taxa Falhas (%)']:.1f}% de falhas - fortalecer testes")
-        
-        if not recomendacoes:
-            recomendacoes.append("**✅ Manutenção:** Continue com os processos atuais - performance dentro do esperado")
-        
-        for rec in recomendacoes:
-            st.markdown(f"- {rec}")
+    # Identificar problemas (mantido igual)
+    if taxa_fora_prazo > 50:
+        st.error(f"**⚠️ Atenção:** Mais de 50% das atividades estão fora do prazo!")
+    elif taxa_fora_prazo > 30:
+        st.warning(f"**📊 Observação:** {taxa_fora_prazo:.1f}% das atividades estão fora do prazo")
+    else:
+        st.success(f"**✅ Excelente:** Apenas {taxa_fora_prazo:.1f}% das atividades estão fora do prazo")
+
+with col2:
+    st.markdown("<h3 style='text-align: left;'>💡 Recomendações</h3>", unsafe_allow_html=True)
+
+recomendacoes = []
+
+if total_concluidas > 0:
+    if taxa_fora_prazo > 40:
+        recomendacoes.append("**🔴 Prioridade:** Revisar processos que estão causando atrasos frequentes")
+    
+    if atividades_sem_responsavel > 0:
+        recomendacoes.append(f"**👥 Atribuição:** {atividades_sem_responsavel} atividades sem responsável precisam ser atribuídas")
+    
+    # Verificar responsáveis com baixa performance no prazo - EXCLUIR SEM RESPONSÁVEL
+    resp_baixa_performance = resp_analysis[
+        (resp_analysis['Total Atividades'] >= 3) & 
+        (resp_analysis['Dentro Prazo (%)'] < 50) &
+        (resp_analysis.index != 'Sem Responsável')  # ✅ EXCLUI SEM RESPONSÁVEL
+    ]
+    if not resp_baixa_performance.empty:
+        for resp, dados in resp_baixa_performance.iterrows():
+            recomendacoes.append(f"**🎯 Treinamento:** {resp} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
+    
+    # Verificar módulos problemáticos (mantido igual)
+    mod_problematicos = modulo_analysis[
+        (modulo_analysis['Total'] >= 5) & 
+        (modulo_analysis['Dentro Prazo (%)'] < 40)
+    ]
+    if not mod_problematicos.empty:
+        for mod, dados in mod_problematicos.iterrows():
+            recomendacoes.append(f"**🔧 Otimização:** Módulo {mod} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
+    
+    # NOVAS RECOMENDAÇÕES BASEADAS EM FALHAS
+    if atividades_com_falha_total > 0:
+        recomendacoes.append(f"**🔴 Qualidade:** {atividades_com_falha_total} atividades tiveram falha - revisar processos de teste")
+    
+    # Responsáveis com alta taxa de falhas - EXCLUIR SEM RESPONSÁVEL
+    resp_alta_falhas = resp_analysis[
+        (resp_analysis['Total Atividades'] >= 3) & 
+        (resp_analysis['Taxa Falhas (%)'] > 20) &
+        (resp_analysis.index != 'Sem Responsável')  # ✅ EXCLUI SEM RESPONSÁVEL
+    ]
+    if not resp_alta_falhas.empty:
+        for resp, dados in resp_alta_falhas.iterrows():
+            recomendacoes.append(f"**🧪 Testes:** {resp} tem {dados['Taxa Falhas (%)']:.1f}% de falhas - fortalecer testes")
+
+if not recomendacoes:
+    recomendacoes.append("**✅ Manutenção:** Continue com os processos atuais - performance dentro do esperado")
+
+# Exibir recomendações
+for rec in recomendacoes:
+    st.markdown(rec)
 
 # Rodapé
 st.markdown("---")
-st.markdown("**Dashboard de Produtividade** - Desenvolvido para análise do Time de TI")
+st.markdown("**Dashboard de Produtividade** - Desenvolvido para análise do Time SAI")
 st.markdown(f"📊 **Fonte de dados:** Google Sheets | ⏰ **Prazo estabelecido:** {PRAZO_GESTAO} dias (48h)")
