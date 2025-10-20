@@ -16,61 +16,97 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado
+# CSS personalizado - UNIFICADO
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
+.main-header {
+    font-size: 2.5rem;
+    color: #1f77b4;
+    text-align: center;
+    margin-bottom: 2rem;
+}
+.metric-card {
+    background-color: #f0f2f6;
+    padding: 1rem;
+    border-radius: 10px;
+    border-left: 4px solid #1f77b4;
+}
+.slow-activity {
+    background-color: #ffebee;
+    padding: 1rem;
+    border-radius: 10px;
+    border-left: 4px solid #f44336;
+    margin: 0.5rem 0;
+}
+.fast-activity {
+    background-color: #e8f5e8;
+    padding: 1rem;
+    border-radius: 10px;
+    border-left: 4px solid #4caf50;
+    margin: 0.5rem 0;
+}
+.no-responsible {
+    background-color: #fff3e0;
+    padding: 1rem;
+    border-radius: 10px;
+    border-left: 4px solid #ff9800;
+    margin: 0.5rem 0;
+}
+.on-time {
+    background-color: #e8f5e8;
+    padding: 0.5rem;
+    border-radius: 5px;
+    border-left: 4px solid #4caf50;
+}
+.late {
+    background-color: #ffebee;
+    padding: 0.5rem;
+    border-radius: 5px;
+    border-left: 4px solid #f44336;
+}
+.with-failure {
+    background-color: #ffebee;
+    border: 1px solid #f44336;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 8px 0;
+    color: #c62828;
+    font-family: Arial, sans-serif;
+}
+.with-failure strong {
+    color: inherit;
+}
+
+/* MODOS CLARO/ESCUTO PARA .with-failure */
+@media (prefers-color-scheme: dark) {
+    .with-failure {
+        background-color: #b71c1c;
+        border-color: #f44336;
+        color: #ffcdd2;
     }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #1f77b4;
-    }
+    
+    /* Você pode adicionar outras classes para modo escuro também */
     .slow-activity {
-        background-color: #ffebee;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #f44336;
-        margin: 0.5rem 0;
+        background-color: #b71c1c;
+        border-left-color: #f44336;
+        color: #ffcdd2;
     }
     .fast-activity {
-        background-color: #e8f5e8;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #4caf50;
-        margin: 0.5rem 0;
-    }
-    .no-responsible {
-        background-color: #fff3e0;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #ff9800;
-        margin: 0.5rem 0;
+        background-color: #1b5e20;
+        border-left-color: #4caf50;
+        color: #c8e6c9;
     }
     .on-time {
-        background-color: #e8f5e8;
-        padding: 0.5rem;
-        border-radius: 5px;
-        border-left: 4px solid #4caf50;
+        background-color: #1b5e20;
+        border-left-color: #4caf50;
+        color: #c8e6c9;
     }
     .late {
-        background-color: #ffebee;
-        padding: 0.5rem;
-        border-radius: 5px;
-        border-left: 4px solid #f44336;
+        background-color: #b71c1c;
+        border-left-color: #f44336;
+        color: #ffcdd2;
     }
-    .with-failure {
-        background-color: #fff3e0;
-        padding: 0.5rem;
-        border-radius: 5px;
-        border-left: 4px solid #ff9800;
-        margin: 0.3rem 0;
-    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -80,7 +116,7 @@ st.markdown('<h1 class="main-header">📊 Dashboard Produtividade - Produto SAI 
 # Prazo estabelecido pela gestão (48 horas = 2 dias)
 PRAZO_GESTAO = 2
 
-# Carregar dados do Google Sheets
+# Carregar dados do Google Sheets 
 @st.cache_data(ttl=300)  # Cache de 5 minutos
 def load_data_from_google_sheets():
     try:
@@ -90,51 +126,63 @@ def load_data_from_google_sheets():
         # Converter URL para formato de exportação CSV
         csv_url = sheet_url.replace('/edit?usp=sharing', '/export?format=csv')
         
-        # Carregar dados
-        df = pd.read_csv(csv_url)
+        # Carregar dados da ABA PRINCIPAL (gid=0)
+        df_principal = pd.read_csv(csv_url + "&gid=0")
         
-        # Limpeza dos dados - trata valores NaN
-        df['Responsável'] = df['Responsável'].fillna('Sem Responsável')
-        df['Módulo'] = df['Módulo'].fillna('Sem Módulo')
-        df['Status'] = df['Status'].fillna('Sem Status')
-        df['Falha/ Teste em Produção'] = df['Falha/ Teste em Produção'].fillna('Não')
+        # Carregar dados da ABA CONTROLADOR (gid=357919568)
+        df_controlador = pd.read_csv(csv_url + "&gid=357919568")
+        
+        # Limpeza dos dados PRINCIPAIS - trata valores NaN
+        df_principal['Responsável'] = df_principal['Responsável'].fillna('Sem Responsável')
+        df_principal['Módulo'] = df_principal['Módulo'].fillna('Sem Módulo')
+        df_principal['Status'] = df_principal['Status'].fillna('Sem Status')
+        df_principal['Falha/ Teste em Produção'] = df_principal['Falha/ Teste em Produção'].fillna('Não')
         
         # Converte para string
-        df['Responsável'] = df['Responsável'].astype(str)
-        df['Módulo'] = df['Módulo'].astype(str)
-        df['Status'] = df['Status'].astype(str)
-        df['Falha/ Teste em Produção'] = df['Falha/ Teste em Produção'].astype(str)
+        df_principal['Responsável'] = df_principal['Responsável'].astype(str)
+        df_principal['Módulo'] = df_principal['Módulo'].astype(str)
+        df_principal['Status'] = df_principal['Status'].astype(str)
+        df_principal['Falha/ Teste em Produção'] = df_principal['Falha/ Teste em Produção'].astype(str)
         
         # Converter datas
-        df['Data Abertura'] = pd.to_datetime(df['Data Abertura'], errors='coerce')
-        df['Data Entrega'] = pd.to_datetime(df['Data Entrega'], errors='coerce')
+        df_principal['Data Abertura'] = pd.to_datetime(df_principal['Data Abertura'], errors='coerce')
+        df_principal['Data Entrega'] = pd.to_datetime(df_principal['Data Entrega'], errors='coerce')
         
         # Calcular tempo de entrega (apenas para datas válidas)
-        mask = df['Data Abertura'].notna() & df['Data Entrega'].notna()
-        df.loc[mask, 'Tempo Entrega (dias)'] = (df.loc[mask, 'Data Entrega'] - df.loc[mask, 'Data Abertura']).dt.days
+        mask = df_principal['Data Abertura'].notna() & df_principal['Data Entrega'].notna()
+        df_principal.loc[mask, 'Tempo Entrega (dias)'] = (df_principal.loc[mask, 'Data Entrega'] - df_principal.loc[mask, 'Data Abertura']).dt.days
         
         # Para datas inválidas, definir como NaN
-        df.loc[~mask, 'Tempo Entrega (dias)'] = np.nan
+        df_principal.loc[~mask, 'Tempo Entrega (dias)'] = np.nan
         
         # Classificar se cumpriu o prazo (apenas atividades concluídas)
-        df['Cumpriu Prazo'] = 'Não Concluída'
-        mask_concluidas = (df['Status'] == 'Concluída') & df['Tempo Entrega (dias)'].notna()
-        df.loc[mask_concluidas, 'Cumpriu Prazo'] = df.loc[mask_concluidas, 'Tempo Entrega (dias)'].apply(
+        df_principal['Cumpriu Prazo'] = 'Não Concluída'
+        mask_concluidas = (df_principal['Status'] == 'Concluída') & df_principal['Tempo Entrega (dias)'].notna()
+        df_principal.loc[mask_concluidas, 'Cumpriu Prazo'] = df_principal.loc[mask_concluidas, 'Tempo Entrega (dias)'].apply(
             lambda x: 'Dentro do Prazo' if x <= PRAZO_GESTAO else 'Fora do Prazo'
         )
         
+        # Limpeza básica dos dados do CONTROLADOR
+        df_controlador = df_controlador.fillna('')
+        
         st.success("✅ Dados carregados do Google Sheets com sucesso!")
-        return df
+        return df_principal, df_controlador
         
     except Exception as e:
         st.error(f"❌ Erro ao carregar dados do Google Sheets: {e}")
-        return None
+        return None, None
 
 # Carregar dados
-df = load_data_from_google_sheets()
+df, df_controlador = load_data_from_google_sheets()
 
 if df is None:
     st.stop()
+
+# Verificar se o Controlador foi carregado
+if df_controlador is not None:
+    st.sidebar.success("✅ Controlador carregado")
+else:
+    st.sidebar.warning("⚠️ Controlador não carregado")
 
 # Sidebar - Filtros e informações
 st.sidebar.title("🔧 Filtros")
@@ -369,7 +417,15 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # Abas principais
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📈 Visão Geral", "👥 Por Responsável", "🔧 Por Módulo", "📅 Timeline", "⏰ Análise de Prazos", "🚨 Insights"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+     "📈 Visão Geral", 
+    "👥 Por Responsável", 
+    "🔧 Por Módulo", 
+    "📅 Timeline", 
+    "⏰ Análise de Prazos",
+    "🎛️ Controlador",  
+    "🚨 Insights"      
+])
 
 with tab1:
     st.subheader("Visão Geral da Produtividade")
@@ -764,10 +820,184 @@ with tab5:
                     <strong>ID:</strong> {atividade['ID']} | <strong>Responsável:</strong> {atividade['Responsável']}<br>
                     {atividade['Atividade'][:60]}...
                 </div>
-                """, unsafe_allow_html=True)             
-      
+                """, unsafe_allow_html=True)
+
 
 with tab6:
+    st.subheader("🎛️ Análise da Aba Controlador")
+    
+    if df_controlador is not None:
+        # Limpeza e preparação dos dados do Controlador
+        df_controlador_clean = df_controlador.copy()
+        
+        # Preencher valores vazios
+        df_controlador_clean['Responsável'] = df_controlador_clean['Responsável'].fillna('Sem Responsável')
+        df_controlador_clean['Módulo'] = df_controlador_clean['Módulo'].fillna('Sem Módulo')
+        df_controlador_clean['Pontos'] = pd.to_numeric(df_controlador_clean['Pontos'], errors='coerce').fillna(0)
+        
+        # Converter datas
+        df_controlador_clean['Data Abertura'] = pd.to_datetime(df_controlador_clean['Data Abertura'], errors='coerce')
+        df_controlador_clean['Data Entrega'] = pd.to_datetime(df_controlador_clean['Data Entrega'], errors='coerce')
+        
+        # Calcular tempo de entrega
+        mask = df_controlador_clean['Data Abertura'].notna() & df_controlador_clean['Data Entrega'].notna()
+        df_controlador_clean.loc[mask, 'Tempo Entrega (dias)'] = (df_controlador_clean.loc[mask, 'Data Entrega'] - df_controlador_clean.loc[mask, 'Data Abertura']).dt.days
+        
+        # VISUALIZAÇÃO DOS DADOS COM LUPA EXPANSÍVEL
+        st.markdown("### 📋 Visualização dos Dados")
+        
+        # Criar colunas para o cabeçalho com lupa
+        col_header1, col_header2 = st.columns([3, 1])
+        
+        with col_header1:
+            st.write(f"**Total de demandas:** {len(df_controlador_clean)}")
+        
+        with col_header2:
+            # Botão de lupa para expandir/recolher
+            expandir_tabela = st.button("🔍 Expandir Tabela", key="expandir_controlador")
+        
+        # Mostrar tabela compacta ou expandida
+        if expandir_tabela:
+            st.dataframe(df_controlador_clean, use_container_width=True, height=400)
+            st.button("↸ Recolher Tabela", key="recolher_controlador")
+        else:
+            # Mostrar apenas as primeiras linhas
+            st.dataframe(df_controlador_clean.head(8), use_container_width=True)
+            if len(df_controlador_clean) > 8:
+                st.caption(f"Mostrando 8 de {len(df_controlador_clean)} registros. Use o botão 🔍 para ver todos.")
+        
+        # ESTATÍSTICAS PRINCIPAIS
+        st.markdown("### 📊 Estatísticas do Controlador")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_demandas = len(df_controlador_clean)
+            st.metric("Total de Demandas", total_demandas)
+        
+        with col2:
+            total_pontos = df_controlador_clean['Pontos'].sum()
+            st.metric("Total de Pontos", f"{total_pontos:.0f}")
+        
+        with col3:
+            demanda_media_pontos = df_controlador_clean['Pontos'].mean()
+            st.metric("Média de Pontos/Demanda", f"{demanda_media_pontos:.1f}")
+        
+        with col4:
+            responsaveis_ativos = df_controlador_clean['Responsável'].nunique()
+            st.metric("Responsáveis Ativos", responsaveis_ativos)
+        
+        # ANÁLISE DE PONTOS (DIFICULDADE)
+        st.markdown("### 🎯 Análise de Dificuldade (Pontos)")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Distribuição de pontos
+            st.markdown("#### 📈 Distribuição de Pontos por Demanda")
+            fig_pontos = px.histogram(df_controlador_clean, x='Pontos', 
+                                    title='Distribuição de Pontos (Dificuldade)',
+                                    nbins=10,
+                                    color_discrete_sequence=['#FF6B6B'])
+            st.plotly_chart(fig_pontos, use_container_width=True)
+        
+        with col2:
+            # Top demandas mais difíceis
+            st.markdown("#### 🏆 Top 5 Demandas Mais Complexas")
+            top_dificil = df_controlador_clean.nlargest(5, 'Pontos')[['ID', 'Atividade', 'Pontos', 'Responsável']]
+            for idx, demanda in top_dificil.iterrows():
+                st.markdown(f"""
+                <div class="slow-activity">
+                    <strong>{demanda['Pontos']} pontos</strong><br>
+                    <strong>ID:</strong> {demanda['ID']} | <strong>Responsável:</strong> {demanda['Responsável']}<br>
+                    {demanda['Atividade'][:60]}...
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # ANÁLISE POR RESPONSÁVEL
+        st.markdown("### 👤 Análise por Responsável")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Pontos por responsável
+            pontos_por_resp = df_controlador_clean.groupby('Responsável').agg({
+                'ID': 'count',
+                'Pontos': 'sum',
+                'Tempo Entrega (dias)': 'mean'
+            }).round(1)
+            pontos_por_resp.columns = ['Total Demandas', 'Pontos Totais', 'Tempo Médio (dias)']
+            pontos_por_resp = pontos_por_resp.sort_values('Pontos Totais', ascending=False)
+            
+            st.markdown("#### 📊 Pontos por Responsável")
+            st.dataframe(pontos_por_resp, use_container_width=True)
+        
+        with col2:
+            # Gráfico de pontos por responsável
+            if not pontos_por_resp.empty:
+                fig_pontos_resp = px.bar(pontos_por_resp.head(10), 
+                                       x=pontos_por_resp.head(10).index,
+                                       y='Pontos Totais',
+                                       title='Top 10 - Pontos por Responsável',
+                                       color='Pontos Totais',
+                                       color_continuous_scale='Viridis')
+                fig_pontos_resp.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig_pontos_resp, use_container_width=True)
+        
+        # ANÁLISE POR MÓDULO
+        st.markdown("### 🔧 Análise por Módulo")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Pontos por módulo
+            pontos_por_modulo = df_controlador_clean.groupby('Módulo').agg({
+                'ID': 'count',
+                'Pontos': 'sum'
+            }).round(1)
+            pontos_por_modulo.columns = ['Total Demandas', 'Pontos Totais']
+            pontos_por_modulo = pontos_por_modulo.sort_values('Pontos Totais', ascending=False)
+            
+            st.markdown("#### 📊 Módulos por Complexidade")
+            st.dataframe(pontos_por_modulo, use_container_width=True)
+        
+        with col2:
+            # Gráfico de pontos por módulo
+            if not pontos_por_modulo.empty:
+                fig_pontos_mod = px.pie(pontos_por_modulo, 
+                                      values='Pontos Totais', 
+                                      names=pontos_por_modulo.index,
+                                      title='Distribuição de Pontos por Módulo')
+                st.plotly_chart(fig_pontos_mod, use_container_width=True)
+        
+                
+        # INSIGHTS ESPECÍFICOS DO CONTROLADOR
+        st.markdown("### 💡 Insights do Controlador")
+        
+        # Responsável com mais pontos (mais complexidade)
+        resp_mais_pontos = pontos_por_resp.nlargest(1, 'Pontos Totais')
+        if not resp_mais_pontos.empty:
+            resp, dados = list(resp_mais_pontos.iterrows())[0]
+            st.info(f"**🏆 Maior complexidade:** {resp} - {dados['Pontos Totais']} pontos totais")
+        
+        # Módulo mais complexo
+        modulo_mais_pontos = pontos_por_modulo.nlargest(1, 'Pontos Totais')
+        if not modulo_mais_pontos.empty:
+            mod, dados = list(modulo_mais_pontos.iterrows())[0]
+            st.info(f"**🔧 Módulo mais complexo:** {mod} - {dados['Pontos Totais']} pontos totais")
+        
+        # Demanda mais difícil
+        if not df_controlador_clean.empty:
+            demanda_mais_dificil = df_controlador_clean.nlargest(1, 'Pontos')
+            if not demanda_mais_dificil.empty:
+                demanda = demanda_mais_dificil.iloc[0]
+                st.warning(f"**🚨 Demanda mais complexa:** ID {demanda['ID']} - {demanda['Pontos']} pontos - {demanda['Responsável']}")
+    
+    else:
+        st.error("❌ Não foi possível carregar os dados do Controlador")             
+      
+
+with tab7:
     st.subheader("🚨 Insights e Recomendações")
     
     # Insights baseados nos dados
