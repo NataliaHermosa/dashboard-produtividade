@@ -702,7 +702,7 @@ if pagina == "📊 Dashboard":
         "📅 Timeline", 
         "⏰ Análise de Prazos",
         "🎛️ Controlador",  
-        "🚨 Insights",
+        "💡 Insights",
         "🚨 Alertas"      
     ])
 
@@ -1336,10 +1336,13 @@ if pagina == "📊 Dashboard":
                         cor_fundo = "#fff3e0"
                         emoji = "🟡"
                 
+                    # Determinar a classe CSS baseada no nível
+                    classe_css = "card-critico" if demanda['Nível Alerta'] == '🔴 Crítico' else "card-alerta"
+
                     st.markdown(f"""
-                    <div style="background-color: {cor_fundo}; border: 2px solid {cor_borda}; border-radius: 10px; padding: 1rem; margin: 0.5rem 0;">
+                    <div class="{classe_css}">
                         <div style="display: flex; justify-content: between; align-items: center;">
-                        <h4 style="margin: 0; color: {cor_borda};">{emoji} {demanda['Nível Alerta']} - {demanda['Dias em Aberto']} dias em aberto</h4>
+                            <h4 style="margin: 0;">{demanda['Nível Alerta']} - {demanda['Dias em Aberto']} dias em aberto</h4>
                         </div>
                         <div style="margin-top: 0.5rem;">
                             <strong>📝 Atividade:</strong> {demanda['Atividade']}<br>
@@ -1351,7 +1354,7 @@ if pagina == "📊 Dashboard":
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-            
+                    
                 # Gráfico de distribuição
                 st.markdown("---")
                 st.subheader("📊 Análise dos Alertas")
@@ -1405,21 +1408,45 @@ if pagina == "📊 Dashboard":
             </div>
             """, unsafe_allow_html=True)
 
-    # Adicionar CSS para modo escuro
+    # Adicionar CSS ESPECÍFICO para os cards de alerta
     st.markdown("""
     <style>
+    /* Aplicar apenas aos cards de demanda - MODO CLARO (padrão) */
+    .card-alerta {
+        background-color: #fff3e0;
+        border: 2px solid #ff9800;
+        border-radius: 10px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        color: #000000;
+    }
+    
+    .card-critico {
+        background-color: #ffebee;
+        border: 2px solid #f44336;
+        border-radius: 10px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        color: #000000;
+    }
+    
+    /* MODO ESCURO */
     @media (prefers-color-scheme: dark) {
-        [style*="background-color: #fff3e0"] {
-            background-color: #e65100 !important;
-            color: #ffe0b2 !important;
+        .card-alerta {
+            background-color: #5d4037 !important;
+            border-color: #ff9800 !important;
+            color: #ffcc80 !important;
         }
-        [style*="background-color: #ffebee"] {
-            background-color: #b71c1c !important;
-            color: #ffcdd2 !important;
+        
+        .card-critico {
+            background-color: #4a148c !important;
+            border-color: #f44336 !important;
+            color: #e1bee7 !important;
         }
-        [style*="background-color: #e8f5e8"] {
-            background-color: #1b5e20 !important;
-            color: #c8e6c9 !important;
+        
+        .card-alerta strong,
+        .card-critico strong {
+            color: inherit !important;
         }
     }
     </style>
