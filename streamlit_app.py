@@ -302,6 +302,63 @@ def inserir_dados_controlador():
                 except Exception as e:
                     st.error(f"❌ Erro ao salvar atividade: {e}")
 
+def calcular_dias_em_aberto(df):
+    """
+    Calcula dias em aberto para demandas não finalizadas
+    """
+    if df.empty:
+        return pd.DataFrame()
+    
+    df_alerta = df.copy()
+    
+    # Status que indicam "não finalizado"
+    status_nao_finalizados = ['Pendente', 'Em Andamento', 'Aberta', 'Aberto', 'Open', 'To Do', 'In Progress', 'Em Desenvolvimento']
+    
+    # Filtrar por status não finalizados
+    status_existentes = [s for s in status_nao_finalizados if s in df_alerta['Status'].values]
+    
+    if status_existentes:
+        df_alerta = df_alerta[df_alerta['Status'].isin(status_existentes)]
+    else:
+        # Fallback: usar data entrega vazia
+        if 'Data Entrega' in df_alerta.columns:
+            df_alerta = df_alerta[
+                df_alerta['Data Entrega'].isna() | 
+                (df_alerta['Data Entrega'] == '') |
+                (df_alerta['Data Entrega'].astype(str).str.strip() == '') |
+                (df_alerta['Data Entrega'].astype(str).str.strip() == 'NaT')
+            ]
+    
+    if df_alerta.empty or 'Data Abertura' not in df_alerta.columns:
+        return pd.DataFrame()
+    
+    # Garantir que as datas estão em formato correto
+    df_alerta['Data Abertura'] = pd.to_datetime(df_alerta['Data Abertura'], errors='coerce')
+    df_alerta = df_alerta.dropna(subset=['Data Abertura'])
+    
+    if df_alerta.empty:
+        return pd.DataFrame()
+    
+    # Calcular dias em aberto
+    hoje = pd.Timestamp.now().normalize()
+    df_alerta['Dias em Aberto'] = (hoje - df_alerta['Data Abertura']).dt.days
+    
+    # Classificar alertas
+    def classificar_alerta(dias):
+        if dias >= 7:
+            return '🔴 Crítico'
+        elif dias >= 5:
+            return '🟡 Alerta'
+        else:
+            return '✅ Normal'
+    
+    df_alerta['Nível Alerta'] = df_alerta['Dias em Aberto'].apply(classificar_alerta)
+    
+    # Filtrar apenas alertas (5+ dias)
+    df_alerta = df_alerta[df_alerta['Dias em Aberto'] >= 5]
+    
+    return df_alerta.sort_values('Dias em Aberto', ascending=False)
+
 # Sistema de navegação
 st.sidebar.title("🧭 Navegação")
 pagina = st.sidebar.radio(
@@ -418,7 +475,7 @@ if pagina == "📊 Dashboard":
         except:
             return []
 
-    # Filtro por DATA - VERSÃO CORRIGIDA
+    # Filtro por DATA 
     st.sidebar.markdown("---")
     st.sidebar.subheader("📅 Filtro por Período")
 
@@ -638,14 +695,15 @@ if pagina == "📊 Dashboard":
     """, unsafe_allow_html=True)
 
     # Abas principais
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
          "📈 Visão Geral", 
         "👥 Por Responsável", 
         "🔧 Por Módulo", 
         "📅 Timeline", 
         "⏰ Análise de Prazos",
         "🎛️ Controlador",  
-        "🚨 Insights"      
+        "🚨 Insights",
+        "🚨 Alertas"      
     ])
 
     with tab1:
@@ -1217,120 +1275,155 @@ if pagina == "📊 Dashboard":
             st.error("❌ Não foi possível carregar os dados do Controlador")             
           
 
-    with tab7:
-        st.subheader("🚨 Insights e Recomendações")
+    with tab8:
+        st.subheader("🚨 Alertas - Demandas em Aberto")
+    
+        st.markdown("""
+        <div style="background-color: #fff3e0; padding: 1rem; border-radius: 10px; border-left: 4px solid #ff9800; margin: 1rem 0;">
+            <h4 style="margin: 0; color: #e65100;">📋 Sistema de Classificação de Alertas</h4>
+            <p style="margin: 0.5rem 0 0 0; color: #e65100;">
+                <strong>🟡 Alerta:</strong> 5-6 dias em aberto | <strong>🔴 Crítico:</strong> 7+ dias em aberto
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Calcular demandas em alerta
+        df_alertas = calcular_dias_em_aberto(df_filtrado)
+    
+        if not df_alertas.empty:
+            # Estatísticas rápidas
+            total_alertas = len(df_alertas)
+            criticos = len(df_alertas[df_alertas['Nível Alerta'] == '🔴 Crítico'])
+            alertas = len(df_alertas[df_alertas['Nível Alerta'] == '🟡 Alerta'])
         
-        # Insights baseados nos dados
-        col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
         
-        with col1:
-            st.markdown("### 📋 Insights de Performance")
-              
-        if total_concluidas > 0:
-            # EXCLUIR "Sem Responsável" da análise - FILTRO ADICIONADO
-            resp_analysis_filtrado = resp_analysis[
-                (resp_analysis['Total Atividades'] > 0) & 
-                (resp_analysis.index != 'Sem Responsável')  # ✅ EXCLUI SEM RESPONSÁVEL
-            ]
-            
-            # Três responsáveis com performance mais baixa (mais lentos)
-            piores_prazo_resp = resp_analysis_filtrado.nsmallest(3, 'Dentro Prazo (%)') 
-
-            if not piores_prazo_resp.empty:
-                st.warning("**🐌 Maiores dificuldades com prazos:**")
-
-                for idx, (resp, dados) in enumerate(piores_prazo_resp.iterrows(), 1):
-                    emoji = "🥉" if idx == 3 else "🥈" if idx == 2 else "🥇"
-                    st.write(f"{emoji} **{idx}º {resp}** - {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
-
-                    # Mostra estatísticas detalhadas
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Total", int(dados['Total Atividades']))
-                    with col2:
-                        dentro_prazo_qtd = int(dados['Total Atividades'] * (dados['Dentro Prazo (%)'] / 100))
-                        st.metric("Dentro Prazo", dentro_prazo_qtd)
-                    with col3:
-                        fora_prazo_qtd = int(dados['Total Atividades'] - dentro_prazo_qtd)
-                        st.metric("Fora Prazo", fora_prazo_qtd)
-
-                    st.markdown("---")
+            with col1:
+                st.metric("🚨 Total em Alerta", total_alertas)
+            with col2:
+                st.metric("🔴 Críticos", criticos)
+            with col3:
+                st.metric("🟡 Alertas", alertas)
+        
+            # Filtro por nível de alerta
+            st.markdown("---")
+            st.subheader("🔍 Filtrar Alertas")
+        
+            nivel_alerta = st.selectbox(
+                "Selecione o nível de alerta:",
+                ["Todos", "🔴 Crítico", "🟡 Alerta"],
+                key="filtro_alerta"
+            )
+        
+            # Aplicar filtro
+            if nivel_alerta != "Todos":
+                df_alertas_filtrado = df_alertas[df_alertas['Nível Alerta'] == nivel_alerta]
             else:
-                st.info("📊 Não há responsáveis com dados suficientes para análise")
-
-        else:
-            st.info("📊 Dados insuficientes para análise de performance")
-
-        # Módulo com melhor performance no prazo (mantido igual)
-        melhor_prazo_mod = modulo_analysis[modulo_analysis['Total'] > 0].nlargest(1, 'Dentro Prazo (%)')
-        if not melhor_prazo_mod.empty:
-            mod, dados = list(melhor_prazo_mod.iterrows())[0]
-            st.info(f"**🔧 Módulo mais eficiente:** {mod} - {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
+                df_alertas_filtrado = df_alertas
         
-        # Identificar problemas (mantido igual)
-        if taxa_fora_prazo > 50:
-            st.error(f"**⚠️ Atenção:** Mais de 50% das atividades estão fora do prazo!")
-        elif taxa_fora_prazo > 30:
-            st.warning(f"**📊 Observação:** {taxa_fora_prazo:.1f}% das atividades estão fora do prazo")
+            if not df_alertas_filtrado.empty:
+                # Mostrar detalhes das demandas
+                st.markdown(f"### 📋 Detalhes das Demandas em Alerta ({len(df_alertas_filtrado)})")
+            
+                for idx, demanda in df_alertas_filtrado.iterrows():
+                    # Definir cor baseada no nível
+                    if demanda['Nível Alerta'] == '🔴 Crítico':
+                        cor_borda = "#f44336"
+                        cor_fundo = "#ffebee"
+                        emoji = "🔴"
+                    else:
+                        cor_borda = "#ff9800"
+                        cor_fundo = "#fff3e0"
+                        emoji = "🟡"
+                
+                    st.markdown(f"""
+                    <div style="background-color: {cor_fundo}; border: 2px solid {cor_borda}; border-radius: 10px; padding: 1rem; margin: 0.5rem 0;">
+                        <div style="display: flex; justify-content: between; align-items: center;">
+                        <h4 style="margin: 0; color: {cor_borda};">{emoji} {demanda['Nível Alerta']} - {demanda['Dias em Aberto']} dias em aberto</h4>
+                        </div>
+                        <div style="margin-top: 0.5rem;">
+                            <strong>📝 Atividade:</strong> {demanda['Atividade']}<br>
+                            <strong>👤 Responsável:</strong> {demanda['Responsável']}<br>
+                            <strong>🔧 Módulo:</strong> {demanda['Módulo']}<br>
+                            <strong>📅 Data Abertura:</strong> {demanda['Data Abertura']}<br>
+                            <strong>📊 Status:</strong> {demanda['Status']}<br>
+                            <strong>🚀 Sprint:</strong> {demanda.get('Sprint', 'N/A')}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+                # Gráfico de distribuição
+                st.markdown("---")
+                st.subheader("📊 Análise dos Alertas")
+            
+                col1, col2 = st.columns(2)
+            
+                with col1:
+                    # Gráfico por nível de alerta
+                    contagem_alertas = df_alertas_filtrado['Nível Alerta'].value_counts()
+                    fig_alertas = px.pie(
+                        values=contagem_alertas.values,
+                        names=contagem_alertas.index,
+                        title='Distribuição por Nível de Alerta',
+                        color=contagem_alertas.index,
+                        color_discrete_map={'🔴 Crítico': '#f44336', '🟡 Alerta': '#ff9800'}
+                    )
+                    st.plotly_chart(fig_alertas, use_container_width=True)
+            
+                with col2:
+                    # Gráfico por responsável
+                    if len(df_alertas_filtrado) > 0:
+                        alertas_por_resp = df_alertas_filtrado.groupby('Responsável').size().sort_values(ascending=False)
+                        fig_resp_alertas = px.bar(
+                            x=alertas_por_resp.index,
+                            y=alertas_por_resp.values,
+                            title='Alertas por Responsável',
+                            labels={'x': 'Responsável', 'y': 'Quantidade de Alertas'},
+                            color=alertas_por_resp.values,
+                            color_continuous_scale='Reds'
+                        )
+                        fig_resp_alertas.update_layout(xaxis_tickangle=-45)
+                        st.plotly_chart(fig_resp_alertas, use_container_width=True)
+        
+            else:
+                st.success(f"✅ Nenhuma demanda encontrada para o filtro '{nivel_alerta}'!")
+    
         else:
-            st.success(f"**✅ Excelente:** Apenas {taxa_fora_prazo:.1f}% das atividades estão fora do prazo")
+            st.success("""
+        🎉 **Excelente! Não há demandas em situação de alerta.**
+        
+        Todas as demandas em aberto estão com menos de 5 dias de pendência.
+        """)
+        
+        # Mostrar algumas estatísticas positivas
+            st.markdown("""
+            <div style="background-color: #e8f5e8; padding: 1rem; border-radius: 10px; border-left: 4px solid #4caf50;">
+                <h4 style="margin: 0; color: #2e7d32;">📈 Status Positivo</h4>
+                <p style="margin: 0.5rem 0 0 0; color: #2e7d32;">
+                Todas as demandas estão sendo tratadas dentro dos prazos estabelecidos!
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        with col2:
-            st.markdown("<h3 style='text-align: left;'>💡 Recomendações</h3>", unsafe_allow_html=True)
-
-        recomendacoes = []
-
-        if total_concluidas > 0:
-            if taxa_fora_prazo > 40:
-                recomendacoes.append("**🔴 Prioridade:** Revisar processos que estão causando atrasos frequentes")
-            
-            if atividades_sem_responsavel > 0:
-                recomendacoes.append(f"**👥 Atribuição:** {atividades_sem_responsavel} atividades sem responsável precisam ser atribuídas")
-            
-            # Verificar responsáveis com baixa performance no prazo - EXCLUIR SEM RESPONSÁVEL
-            resp_baixa_performance = resp_analysis[
-                (resp_analysis['Total Atividades'] >= 3) & 
-                (resp_analysis['Dentro Prazo (%)'] < 50) &
-                (resp_analysis.index != 'Sem Responsável')  # ✅ EXCLUI SEM RESPONSÁVEL
-            ]
-            if not resp_baixa_performance.empty:
-                for resp, dados in resp_baixa_performance.iterrows():
-                    recomendacoes.append(f"**🎯 Treinamento:** {resp} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
-            
-            # Verificar módulos problemáticos (mantido igual)
-            mod_problematicos = modulo_analysis[
-                (modulo_analysis['Total'] >= 5) & 
-                (modulo_analysis['Dentro Prazo (%)'] < 40)
-            ]
-            if not mod_problematicos.empty:
-                for mod, dados in mod_problematicos.iterrows():
-                    recomendacoes.append(f"**🔧 Otimização:** Módulo {mod} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
-            
-            # NOVAS RECOMENDAÇÕES BASEADAS EM FALHAS
-            if atividades_com_falha_total > 0:
-                recomendacoes.append(f"**🔴 Qualidade:** {atividades_com_falha_total} atividades tiveram falha - revisar processos de teste")
-            
-            # Responsáveis com alta taxa de falhas - EXCLUIR SEM RESPONSÁVEL
-            resp_alta_falhas = resp_analysis[
-                (resp_analysis['Total Atividades'] >= 3) & 
-                (resp_analysis['Taxa Falhas (%)'] > 20) &
-                (resp_analysis.index != 'Sem Responsável')  # ✅ EXCLUI SEM RESPONSÁVEL
-            ]
-            if not resp_alta_falhas.empty:
-                for resp, dados in resp_alta_falhas.iterrows():
-                    recomendacoes.append(f"**🧪 Testes:** {resp} tem {dados['Taxa Falhas (%)']:.1f}% de falhas - fortalecer testes")
-
-        if not recomendacoes:
-            recomendacoes.append("**✅ Manutenção:** Continue com os processos atuais - performance dentro do esperado")
-
-        # Exibir recomendações
-        for rec in recomendacoes:
-            st.markdown(rec)
-
-        # Rodapé
-        st.markdown("---")
-        st.markdown("**Dashboard de Produtividade** - Desenvolvido para análise do Time SAI")
-        st.markdown(f"📊 **Fonte de dados:** Google Sheets | ⏰ **Prazo estabelecido:** {PRAZO_GESTAO} dias (48h)")
+    # Adicionar CSS para modo escuro
+    st.markdown("""
+    <style>
+    @media (prefers-color-scheme: dark) {
+        [style*="background-color: #fff3e0"] {
+            background-color: #e65100 !important;
+            color: #ffe0b2 !important;
+        }
+        [style*="background-color: #ffebee"] {
+            background-color: #b71c1c !important;
+            color: #ffcdd2 !important;
+        }
+        [style*="background-color: #e8f5e8"] {
+            background-color: #1b5e20 !important;
+            color: #c8e6c9 !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 else:  # Página "📝 Inserir Dados"
     st.markdown('<h1 class="main-header">📝 Inserir Dados - Produto SAI </h1>', unsafe_allow_html=True)
