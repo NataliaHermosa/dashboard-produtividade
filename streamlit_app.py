@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import gspread
 from google.oauth2.service_account import Credentials
+import os
 
 # Configuração da página
 st.set_page_config(
@@ -367,6 +368,286 @@ pagina = st.sidebar.radio(
     key="navegacao_principal"
 )
 
+# =============================================================================
+# SISTEMA DO ASSISTENTE IA PARA PRODUTIVIDADE - VERSÃO MELHORADA
+# =============================================================================
+
+def show_assistente_produtividade_ia(df_manutencao_filtrado, df_controlador_filtrado, gemini_key=None):
+    """Exibe a interface do assistente de IA para análise de produtividade - VERSÃO MELHORADA"""
+    
+    st.header("🤖 Assistente de IA - Análise de Produtividade")
+    st.write("Faça perguntas em português sobre os dados de produtividade e receba insights automatizados.")
+    
+    # Inicializar estado da sessão
+    if 'produtividade_assistant_responses' not in st.session_state:
+        st.session_state.produtividade_assistant_responses = []
+    if 'produtividade_current_question' not in st.session_state:
+        st.session_state.produtividade_current_question = ""
+    if 'produtividade_last_response' not in st.session_state:
+        st.session_state.produtividade_last_response = ""
+    if 'produtividade_processing_question' not in st.session_state:
+        st.session_state.produtividade_processing_question = False
+    
+    # Configuração do modelo
+    model_options = [
+        '🚀 Gemini Pro - Análise Avançada',
+        '⚡ Gemini Flash - Resposta Rápida' 
+    ]
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        selected_model = st.selectbox(
+            label='**Nível de análise:**',
+            options=model_options,
+            index=0,
+            key='produtividade_assistant_model'
+        )
+    
+        if selected_model == '🚀 Gemini Pro - Análise Avançada':
+            st.caption("💡 Análises profundas e insights detalhados")
+        elif selected_model == '⚡ Gemini Flash - Resposta Rápida':
+            st.caption("💡 Respostas rápidas para perguntas simples")
+    
+    with col2:
+        st.write("")
+        st.write("")
+        if st.button("🔄 Limpar Histórico", key='reset_produtividade_assistant'):
+            st.session_state.produtividade_assistant_responses = []
+            st.session_state.produtividade_last_response = ""
+            st.session_state.produtividade_current_question = ""
+            st.session_state.produtividade_processing_question = False
+            st.success("✅ Histórico limpo!")
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # SUGESTÕES DE PERGUNTAS CONTEXTUAIS MELHORADAS
+    st.markdown("### 💡 Sugestões de Perguntas Contextuais")
+    
+    # Primeira linha de sugestões
+    col_sug1, col_sug2, col_sug3, col_sug4 = st.columns(4)
+
+    with col_sug1:
+        if st.button("📊 Análise Geral", use_container_width=True):
+            st.session_state.produtividade_current_question = "Faça uma análise geral completa da produtividade do time, incluindo métricas de conclusão, prazos, qualidade e distribuição por módulos."
+            st.rerun()
+
+    with col_sug2:
+        if st.button("⏰ Desempenho", use_container_width=True):
+            st.session_state.produtividade_current_question = "Como está o desempenho da equipe em relação aos prazos de 48 horas? Quem são os colaboradores com melhor e pior performance em termos de tempo de entrega?"
+            st.rerun()
+
+    with col_sug3:
+        if st.button("🔧 Módulos", use_container_width=True):
+            st.session_state.produtividade_current_question = "Quais módulos têm mais atividades, falhas e atrasos? Há algum padrão específico no Portal da Transparência ou outros módulos que precise de atenção?"
+            st.rerun()
+
+    with col_sug4:
+        if st.button("👥 Equipe", use_container_width=True):
+            st.session_state.produtividade_current_question = "Analise o desempenho individual de cada colaborador. Quem tem a melhor taxa de conclusão? Há alguém com muitos problemas de qualidade ou atrasos?"
+            st.rerun()
+
+    # Segunda linha de sugestões
+    col_sug5, col_sug6, col_sug7, col_sug8 = st.columns(4)
+
+    with col_sug5:
+        if st.button("🚀 Sprint", use_container_width=True):
+            st.session_state.produtividade_current_question = "Como está o andamento da sprint atual? Qual é o progresso e há riscos de não cumprimento dos objetivos?"
+            st.rerun()
+
+    with col_sug6:
+        if st.button("🔴 Qualidade", use_container_width=True):
+            st.session_state.produtividade_current_question = "Qual é a taxa de falhas geral da equipe? Quais módulos e colaboradores têm mais problemas de qualidade? O que pode ser feito para melhorar?"
+            st.rerun()
+
+    with col_sug7:
+        if st.button("📈 Tendências", use_container_width=True):
+            st.session_state.produtividade_current_question = "Quais são as tendências de produtividade ao longo do tempo? Estamos melhorando ou piorando em termos de velocidade e qualidade?"
+            st.rerun()
+
+    with col_sug8:
+        if st.button("🎯 Recomendações", use_container_width=True):
+            st.session_state.produtividade_current_question = "Baseado nos dados, quais são as 3 principais recomendações para melhorar a produtividade e qualidade do time SAI?"
+            st.rerun()
+    
+    # INSIGHTS AUTOMÁTICOS (NOVO)
+    st.markdown("---")
+    st.markdown("### 🎯 Insights Automáticos")
+    
+    # Botão para gerar insights automáticos
+    if st.button("✨ Gerar Insights Automáticos", use_container_width=True):
+        try:
+            from assistente_produtividade import gerar_insights_automaticos
+            insights = gerar_insights_automaticos(df_manutencao_filtrado, df_controlador_filtrado)
+            st.session_state.produtividade_current_question = "Com base nos insights automáticos gerados, forneça uma análise detalhada e recomendações específicas."
+            # Armazenar insights para uso na consulta
+            st.session_state.insights_automaticos = insights
+            st.rerun()
+        except ImportError:
+            st.error("❌ Módulo de insights não disponível")
+    
+    # Mostrar insights se disponíveis
+    if 'insights_automaticos' in st.session_state:
+        with st.expander("📊 Insights Gerados Automaticamente"):
+            st.markdown(st.session_state.insights_automaticos)
+    
+    st.markdown("---")
+    
+    # Área de pergunta
+    user_question = st.text_area(
+        '**Digite sua pergunta:**',
+        placeholder='Ex: Quem são os colaboradores com melhor desempenho? Quais módulos demandam mais atenção? Como melhorar nossa taxa de entrega dentro do prazo? Analise o desempenho do Portal da Transparência...',
+        height=100,
+        key='produtividade_assistant_question',
+        value=st.session_state.produtividade_current_question
+    )
+    
+    # Atualizar a pergunta atual no session_state
+    st.session_state.produtividade_current_question = user_question
+    
+    col1, col2 = st.columns([1, 4])
+    
+    with col1:
+        consultar_button = st.button('🔍 Consultar Assistente', type='primary', key='produtividade_assistant_btn', use_container_width=True)
+    
+    with col2:
+        if st.session_state.produtividade_last_response and not st.session_state.produtividade_processing_question:
+            if st.button('📋 Copiar Resposta', key='produtividade_copy_response', use_container_width=True):
+                st.code(st.session_state.produtividade_last_response, language='markdown')
+                st.success("✅ Resposta copiada para a área de transferência!")
+    
+    # VERIFICAR SE HÁ UMA CONSULTA PENDENTE PARA PROCESSAR
+    if consultar_button and user_question and not st.session_state.produtividade_processing_question:
+        # Marcar que estamos processando
+        st.session_state.produtividade_processing_question = True
+        st.session_state.produtividade_current_question = user_question
+        
+        # Armazenar a pergunta para processamento
+        st.session_state.produtividade_pending_question = user_question
+        st.session_state.produtividade_pending_model = selected_model
+        
+        # Incluir insights automáticos se disponíveis
+        if 'insights_automaticos' in st.session_state:
+            st.session_state.produtividade_pending_insights = st.session_state.insights_automaticos
+        else:
+            st.session_state.produtividade_pending_insights = None
+        
+        # Forçar rerun imediatamente para mostrar o spinner
+        st.rerun()
+    
+    # PROCESSAR A CONSULTA APÓS O RERUN
+    if st.session_state.get('produtividade_processing_question', False) and st.session_state.get('produtividade_pending_question'):
+        # Container para o spinner
+        processing_placeholder = st.empty()
+        
+        with processing_placeholder.container():
+            with st.spinner('🤔 Analisando dados de produtividade... Isso pode levar alguns segundos'):
+                try:
+                    # Importar módulo do assistente
+                    try:
+                        from assistente_produtividade import consultar_assistente_produtividade
+                    except ImportError as e:
+                        # Fallback local
+                        def consultar_assistente_produtividade_fallback(pergunta, df_manutencao, df_controlador, tipo_modelo, gemini_key):
+                            return f"❌ Módulo do assistente não disponível. Erro: {e}\n\n📊 **Análise Local:**\n- Manutenção: {len(df_manutencao)} registros\n- Controlador: {len(df_controlador)} registros"
+                        consultar_assistente_produtividade = consultar_assistente_produtividade_fallback
+                    
+                    # Executar consulta
+                    resposta = consultar_assistente_produtividade(
+                        pergunta=st.session_state.produtividade_pending_question,
+                        df_manutencao=df_manutencao_filtrado,
+                        df_controlador=df_controlador_filtrado,
+                        tipo_modelo=st.session_state.produtividade_pending_model,
+                        gemini_key=gemini_key
+                    )
+                    
+                    # Salvar no histórico
+                    nova_resposta = {
+                        'pergunta': st.session_state.produtividade_pending_question,
+                        'resposta': resposta,
+                        'modelo': st.session_state.produtividade_pending_model,
+                        'timestamp': datetime.now().strftime('%d/%m/%Y %H:%M'),
+                        'registros_manutencao': len(df_manutencao_filtrado),
+                        'registros_controlador': len(df_controlador_filtrado)
+                    }
+                    
+                    st.session_state.produtividade_assistant_responses.append(nova_resposta)
+                    st.session_state.produtividade_last_response = resposta
+                    
+                except Exception as e:
+                    error_msg = f"❌ Erro ao consultar assistente: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.produtividade_last_response = error_msg
+        
+        # Limpar estados de processamento
+        st.session_state.produtividade_processing_question = False
+        st.session_state.produtividade_pending_question = None
+        st.session_state.produtividade_pending_model = None
+        st.session_state.produtividade_pending_insights = None
+        
+        # Limpar o placeholder do spinner
+        processing_placeholder.empty()
+        
+        # Rerun final para mostrar a resposta
+        st.rerun()
+    
+    # MOSTRAR RESPOSTAS
+    if not st.session_state.produtividade_processing_question:
+        # Mostrar última resposta
+        if st.session_state.produtividade_last_response:
+            st.markdown("---")
+            st.subheader("📋 Resposta:")
+            st.markdown(st.session_state.produtividade_last_response)
+            
+            # Informações do contexto
+            with st.expander("ℹ️ Informações do contexto"):
+                st.write(f"**Modelo usado:** {selected_model}")
+                st.write(f"**Registros Manutenção analisados:** {len(df_manutencao_filtrado)}")
+                st.write(f"**Registros Controlador analisados:** {len(df_controlador_filtrado)}")
+                
+                # Estatísticas rápidas
+                if not df_manutencao_filtrado.empty:
+                    concluidas = len(df_manutencao_filtrado[df_manutencao_filtrado['Status'] == 'Concluída'])
+                    taxa_conclusao = (concluidas / len(df_manutencao_filtrado)) * 100
+                    st.write(f"**Taxa de conclusão:** {taxa_conclusao:.1f}%")
+                    
+                    if 'Falha/ Teste em Produção' in df_manutencao_filtrado.columns:
+                        falhas = len(df_manutencao_filtrado[df_manutencao_filtrado['Falha/ Teste em Produção'] == 'Sim'])
+                        taxa_falhas = (falhas / len(df_manutencao_filtrado)) * 100
+                        st.write(f"**Taxa de falhas:** {taxa_falhas:.1f}%")
+                
+                st.write(f"**Data/hora:** {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        
+        # Mostrar histórico de conversas
+        if len(st.session_state.produtividade_assistant_responses) > 1:
+            st.markdown("---")
+            st.subheader("📚 Histórico de Consultas")
+            
+            # Mostrar do mais recente para o mais antigo (exceto o último que já está mostrado)
+            for i, resp in enumerate(reversed(st.session_state.produtividade_assistant_responses[:-1])):
+                with st.expander(f"🗨️ {resp['pergunta'][:50]}... - {resp['timestamp']}"):
+                    st.write(f"**Pergunta:** {resp['pergunta']}")
+                    st.markdown("**Resposta:**")
+                    st.markdown(resp['resposta'])
+                    st.caption(f"Modelo: {resp['modelo']} | Manutenção: {resp['registros_manutencao']} | Controlador: {resp['registros_controlador']} | {resp['timestamp']}")
+
+
+# =============================================================================
+# BUSCA E VERIFICAÇÃO DA CHAVE GEMINI
+# =============================================================================
+
+def get_gemini_key():
+    """Busca a chave Gemini - VERSÃO SIMPLIFICADA SEM TESTE"""
+    try:
+        # Acesso direto à chave
+        chave = st.secrets["gemini"]["api_key"]
+        st.sidebar.success(f"✅ Chave Gemini carregada: {chave[:7]}...")
+        return chave
+    except Exception as e:
+        st.sidebar.error(f"❌ Erro ao carregar chave Gemini: {e}")
+        return None
+
 if pagina == "📊 Dashboard":
     st.markdown('<h1 class="main-header">📊 Dashboard Produtividade - Produto SAI </h1>', unsafe_allow_html=True)
 
@@ -695,7 +976,7 @@ if pagina == "📊 Dashboard":
     """, unsafe_allow_html=True)
 
     # Abas principais
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
          "📈 Visão Geral", 
         "👥 Por Responsável", 
         "🔧 Por Módulo", 
@@ -703,7 +984,8 @@ if pagina == "📊 Dashboard":
         "⏰ Análise de Prazos",
         "🎛️ Controlador",  
         "💡 Insights",
-        "🚨 Alertas"      
+        "🚨 Alertas",
+        "🤖 Assistente IA"      
     ])
 
     with tab1:
@@ -1275,6 +1557,272 @@ if pagina == "📊 Dashboard":
             st.error("❌ Não foi possível carregar os dados do Controlador")             
           
 
+    with tab7:
+        st.subheader("💡 Análise de Rendimento")
+    
+        col1, col2 = st.columns(2)
+    
+        with col1:
+            # 🆕 ALTERNATIVA 1 - VISÃO COMPLETA DO TOP 5
+            st.markdown("#### 🐌 Top 5 - Mais Entregas Fora do Prazo")
+        
+            if total_concluidas > 0:
+                df_concluidas_validas = df_filtrado[
+                    (df_filtrado['Status'] == 'Concluída') & 
+                    (df_filtrado['Responsável'] != 'Sem Responsável') &
+                    (df_filtrado['Responsável'].notna()) &
+                    (df_filtrado['Cumpriu Prazo'].isin(['Dentro do Prazo', 'Fora do Prazo']))
+                ]
+            
+                if not df_concluidas_validas.empty:
+                    entregas_fora_prazo = df_concluidas_validas[
+                        df_concluidas_validas['Cumpriu Prazo'] == 'Fora do Prazo'
+                    ].groupby('Responsável').agg({
+                        'ID': 'count',
+                        'Tempo Entrega (dias)': 'mean'
+                    }).round(1)
+                
+                    if not entregas_fora_prazo.empty:
+                        entregas_fora_prazo.columns = ['Qtd Fora Prazo', 'Tempo Médio Atraso (dias)']
+                        entregas_fora_prazo = entregas_fora_prazo.sort_values('Qtd Fora Prazo', ascending=False)
+                        top5_fora_prazo = entregas_fora_prazo.head(5)
+                    
+                        # ALTERNATIVA 1 - TABELA ESTILIZADA
+                        st.markdown("##### 📋 Visão em Tabela")
+                        df_display = top5_fora_prazo.reset_index()
+                        df_display.columns = ['Responsável', 'Qtd Atrasos', 'Dias Médio Atraso']
+                        df_display['Posição'] = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
+                        df_display = df_display[['Posição', 'Responsável', 'Qtd Atrasos', 'Dias Médio Atraso']]
+                    
+                    # Estilizar a tabela
+                        st.dataframe(
+                            df_display,
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                    
+                        st.markdown("---")
+                    
+                        # ALTERNATIVA 1 - BARRAS HORIZONTAIS
+                        st.markdown("##### 📊 Visão em Gráfico")
+                    
+                        import matplotlib.pyplot as plt
+                    
+                        fig, ax = plt.subplots(figsize=(10, 4))
+                        colors = ['#ff6b6b', '#ff8e8e', '#ffaaaa', '#ffc4c4', '#ffd8d8']
+                    
+                        bars = ax.barh(
+                            top5_fora_prazo.index[::-1],  # Inverter para ranking correto
+                            top5_fora_prazo['Qtd Fora Prazo'][::-1],
+                            color=colors,
+                            height=0.6
+                        )
+                    
+                        # Adicionar valores nas barras
+                        for i, bar in enumerate(bars):
+                            width = bar.get_width()
+                            ax.text(width + 0.1, bar.get_y() + bar.get_height()/2, 
+                                f'{int(width)} atrasos', 
+                                ha='left', va='center', fontweight='bold')
+                    
+                        ax.set_xlabel('Quantidade de Entregas Fora do Prazo')
+                        ax.spines['top'].set_visible(False)
+                        ax.spines['right'].set_visible(False)
+                        ax.grid(axis='x', alpha=0.3, linestyle='--')
+                    
+                        st.pyplot(fig, use_container_width=True)
+                    
+                        st.markdown("---")
+                    
+                        # ALTERNATIVA 1 - CARDS COMPACTOS EM COLUNAS
+                        st.markdown("##### 👥 Visão em Cards")
+                    
+                        cols_cards = st.columns(2)
+                        for idx, (resp, dados) in enumerate(top5_fora_prazo.iterrows()):
+                            with cols_cards[idx % 2]:  # Alterna entre as colunas
+                                emoji = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else "4️⃣" if idx == 3 else "5️⃣"
+                            
+                                st.markdown(f"""
+                                <div style="background: linear-gradient(135deg, #ffebee, #ffcdd2); 
+                                            padding: 0.8rem; 
+                                            border-radius: 10px; 
+                                            border-left: 5px solid #f44336;
+                                            margin: 0.3rem 0;
+                                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <strong style="font-size: 0.9em;">{emoji} {resp}</strong>
+                                        <span style="background: #f44336; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8em;">
+                                            {idx + 1}º
+                                    </span>
+                                </div>
+                                <div style="margin-top: 0.5rem;">
+                                    <div style="font-size: 0.8em;">🚫 <strong>{int(dados['Qtd Fora Prazo'])}</strong> atrasos</div>
+                                    <div style="font-size: 0.8em;">⏱️ <strong>{dados['Tempo Médio Atraso (dias)']}d</strong> médio</div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                else:
+                    st.success("🎉 Nenhum colaborador com entregas fora do prazo!")
+            else:
+                st.info("📊 Nenhuma atividade concluída válida para análise")
+        
+        st.markdown("---")
+        
+        # 🆕 SEÇÃO DE CASOS ESPECIAIS - JONAS E CRISTIANO
+        st.markdown("#### ⚠️ Casos que Precisam de Atenção Imediata")
+        
+        if total_concluidas > 0:
+            # Calcular performance para identificar casos especiais
+            performance_responsaveis = []
+            
+            for responsavel in df_filtrado['Responsável'].unique():
+                if responsavel != 'Sem Responsável' and pd.notna(responsavel):
+                    df_resp = df_filtrado[
+                        (df_filtrado['Responsável'] == responsavel) & 
+                        (df_filtrado['Status'] == 'Concluída') &
+                        (df_filtrado['Cumpriu Prazo'].isin(['Dentro do Prazo', 'Fora do Prazo']))
+                    ]
+                    
+                    total_resp = len(df_resp)
+                    if total_resp > 0:
+                        dentro_prazo = len(df_resp[df_resp['Cumpriu Prazo'] == 'Dentro do Prazo'])
+                        percentual_dentro = (dentro_prazo / total_resp) * 100
+                        
+                        performance_responsaveis.append({
+                            'Responsável': responsavel,
+                            'Total': total_resp,
+                            'Dentro Prazo': dentro_prazo,
+                            'Fora Prazo': total_resp - dentro_prazo,
+                            'Dentro Prazo (%)': percentual_dentro
+                        })
+            
+            if performance_responsaveis:
+                df_performance = pd.DataFrame(performance_responsaveis)
+                
+                # Identificar casos especiais: 100% fora do prazo com pelo menos 2 atividades
+                casos_especiais = df_performance[
+                    (df_performance['Total'] >= 2) &  # Pelo menos 2 atividades
+                    (df_performance['Dentro Prazo (%)'] == 0)  # 100% fora do prazo
+                ]
+                
+                if not casos_especiais.empty:
+                    for idx, row in casos_especiais.iterrows():
+                        st.markdown(f"""
+                        <div style="background-color: #ffcdd2; padding: 1rem; border-radius: 8px; border-left: 6px solid #d32f2f; margin: 0.5rem 0;">
+                            <strong style="font-size: 1.1em;">🚨 {row['Responsável']} - ATENÇÃO IMEDIATA</strong><br>
+                            <strong>📊 Total de atividades:</strong> {int(row['Total'])}<br>
+                            <strong>❌ Situação crítica:</strong> 100% das entregas fora do prazo<br>
+                            <strong>🚫 Entregas fora do prazo:</strong> {int(row['Fora Prazo'])}<br>
+                            <em>💡 Necessita de mentoria urgente e revisão de processos</em>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.success("✅ Nenhum colaborador com 100% de entregas fora do prazo")
+        
+        st.markdown("---")
+        
+        # 🎯 PERFORMANCE GERAL (APENAS OS PIORES)
+        st.markdown("#### 📊 Dificuldades com Prazos")
+        
+        if total_concluidas > 0:
+            if performance_responsaveis:
+                df_performance = pd.DataFrame(performance_responsaveis)
+                df_performance = df_performance.sort_values('Dentro Prazo (%)')
+                
+                # Filtrar apenas os que têm performance baixa (< 60%)
+                baixa_performance = df_performance[df_performance['Dentro Prazo (%)'] < 60]
+                
+                if not baixa_performance.empty:
+                    for idx, row in baixa_performance.iterrows():
+                        # Pular os casos especiais que já foram mostrados acima
+                        if row['Dentro Prazo (%)'] == 0:
+                            continue
+                            
+                        st.markdown(f"""
+                        <div style="background-color: #fff3e0; padding: 0.8rem; border-radius: 8px; border-left: 4px solid #ff9800; margin: 0.5rem 0;">
+                            <strong>📉 {row['Responsável']}</strong><br>
+                            <strong>Performance:</strong> {row['Dentro Prazo (%)']:.1f}% dentro do prazo<br>
+                            <strong>📊 Estatísticas:</strong> {int(row['Dentro Prazo'])} dentro | {int(row['Fora Prazo'])} fora
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.success("✅ Todos os colaboradores têm boa performance com prazos")
+            else:
+                st.info("📊 Não há dados de performance para exibir")
+        else:
+            st.info("📊 Dados insuficientes para análise de performance")
+
+    with col2:
+        st.markdown("<h3 style='text-align: left;'>💡 Recomendações Ações</h3>", unsafe_allow_html=True)
+
+        recomendacoes = []
+
+        if total_concluidas > 0:
+            # 🆕 RECOMENDAÇÕES ESPECÍFICAS PARA CASOS CRÍTICOS
+            if 'casos_especiais' in locals() and not casos_especiais.empty:
+                for _, caso in casos_especiais.iterrows():
+                    recomendacoes.append(f"**🚨 Ação Imediata:** {caso['Responsável']} precisa de mentoria urgente - 100% fora do prazo em {int(caso['Total'])} atividades")
+            
+            # Recomendações baseadas no ranking
+            if 'top5_fora_prazo' in locals() and not top5_fora_prazo.empty:
+                top1_fora_prazo = top5_fora_prazo.iloc[0]
+                recomendacoes.append(f"**🎯 Foco Prioritário:** {top5_fora_prazo.index[0]} lidera com {int(top1_fora_prazo['Qtd Fora Prazo'])} entregas fora do prazo")
+            
+            if taxa_fora_prazo > 40:
+                recomendacoes.append("**🔴 Revisão de Processos:** Analisar causas dos atrasos frequentes na equipe")
+            
+            if atividades_sem_responsavel > 0:
+                recomendacoes.append(f"**👥 Atribuição Pendente:** {atividades_sem_responsavel} atividades sem responsável definido")
+            
+            # Verificar responsáveis com baixa performance no prazo
+            if 'df_performance' in locals():
+                resp_baixa_performance = df_performance[
+                    (df_performance['Total'] >= 3) & 
+                    (df_performance['Dentro Prazo (%)'] < 50) &
+                    (df_performance['Dentro Prazo (%)'] > 0)  # Exclui os 0% já tratados
+                ]
+                if not resp_baixa_performance.empty:
+                    for _, row in resp_baixa_performance.iterrows():
+                        recomendacoes.append(f"**📚 Capacitação:** {row['Responsável']} tem apenas {row['Dentro Prazo (%)']:.1f}% dentro do prazo")
+            
+            # Verificar módulos problemáticos
+            mod_problematicos = modulo_analysis[
+                (modulo_analysis['Total'] >= 5) & 
+                (modulo_analysis['Dentro Prazo (%)'] < 40)
+            ]
+            if not mod_problematicos.empty:
+                for mod, dados in mod_problematicos.iterrows():
+                    recomendacoes.append(f"**🔧 Otimização de Processo:** Módulo {mod} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
+            
+            # Análise de falhas
+            if atividades_com_falha_total > 0:
+                recomendacoes.append(f"**🧪 Melhoria de Qualidade:** {atividades_com_falha_total} atividades tiveram falha - fortalecer testes")
+
+        if not recomendacoes:
+            recomendacoes.append("**✅ Manutenção:** Continue com os processos atuais - performance dentro do esperado")
+
+        # Exibir recomendações
+        for rec in recomendacoes:
+            st.markdown(f"• {rec}")
+
+        st.markdown("---")
+        st.markdown("#### 📈 Métricas Gerais")
+        
+        col_met1, col_met2, col_met3 = st.columns(3)
+        with col_met1:
+            st.metric("Taxa Fora do Prazo", f"{taxa_fora_prazo:.1f}%")
+        with col_met2:
+            st.metric("Atividades Concluídas", total_concluidas)
+        with col_met3:
+            st.metric("Sem Responsável", atividades_sem_responsavel)
+
+    # Rodapé
+    st.markdown("---")
+    st.markdown("**Dashboard de Produtividade** - Desenvolvido para análise do Time SAI")
+    st.markdown(f"📊 **Fonte de dados:** Google Sheets | ⏰ **Prazo estabelecido pela Gestão para entrega:** {PRAZO_GESTAO} dias (48h)")
+
+
     with tab8:
         st.subheader("🚨 Alertas - Demandas em Aberto")
     
@@ -1451,6 +1999,10 @@ if pagina == "📊 Dashboard":
     }
     </style>
     """, unsafe_allow_html=True)
+
+    with tab9:  # NOVA ABA DO ASSISTENTE IA
+        show_assistente_produtividade_ia(df_filtrado, df_controlador, gemini_key=get_gemini_key())
+
 
 else:  # Página "📝 Inserir Dados"
     st.markdown('<h1 class="main-header">📝 Inserir Dados - Produto SAI </h1>', unsafe_allow_html=True)
