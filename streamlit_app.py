@@ -1591,7 +1591,8 @@ if pagina == "📊 Dashboard":
                         st.markdown("##### 📋 Visão em Tabela")
                         df_display = top5_fora_prazo.reset_index()
                         df_display.columns = ['Responsável', 'Qtd Atrasos', 'Dias Médio Atraso']
-                        df_display['Posição'] = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
+                        posicoes = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
+                        df_display['Posição'] = posicoes[:len(df_display)]
                         df_display = df_display[['Posição', 'Responsável', 'Qtd Atrasos', 'Dias Médio Atraso']]
                     
                     # Estilizar a tabela
