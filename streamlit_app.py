@@ -113,12 +113,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Função para criar campo com dropdown SIMPLIFICADA (sem "Outro")
+# Função para criar campo com dropdown SIMPLIFICADA 
 def criar_campo_dropdown(label, obrigatorio=False, key_suffix=""):
     """
     Cria um campo com dropdown baseado nas opções reais da planilha
     """
-    # OPÇÕES REAIS DA SUA PLANILHA
+    # OPÇÕES PLANILHA
     if "Módulo" in label:
         opcoes_reais = ["Controlador", "Home Page", "Portal da Transparência", "Sai Conecta", 
                        "Ouvidoria/Esic", "Diário Oficial/SEJ", "E-mail", "PNCP", 
@@ -143,28 +143,15 @@ def criar_campo_dropdown(label, obrigatorio=False, key_suffix=""):
     
     return selecionado
 
-# Função para inserir dados na planilha com seleção de aba
+# Função para inserir dados na planilha 
 def inserir_dados_planilha():
     st.header("📝 Inserir Nova Atividade")
     
-    # Seleção da aba
-    st.subheader("1. Selecionar Planilha")
-    aba_selecionada = st.radio(
-        "Em qual planilha deseja inserir os dados?",
-        ["Manutenção", "Controlador"],
-        horizontal=True,
-        key="aba_selecao"
-    )
-    
-    st.markdown("---")
-    
-    # Formulário específico para cada aba
-    if aba_selecionada == "Manutenção":
-        inserir_dados_manutencao()
-    else:
-        inserir_dados_controlador()
+    # REMOVER a seleção de aba e usar apenas Manutenção
+    st.subheader("📋 Formulário - Aba Manutenção")
+    inserir_dados_manutencao()
 
-# Função para inserir dados na aba MANUTENÇÃO (SIMPLIFICADA)
+# Função para inserir dados na aba MANUTENÇÃO (SIMPLIFICADA) - MODIFICADA
 def inserir_dados_manutencao():
     st.subheader("📋 Formulário - Aba Manutenção")
     
@@ -209,8 +196,8 @@ def inserir_dados_manutencao():
                 st.error(f"❌ Preencha todos os campos obrigatórios: {', '.join(campos_faltantes)}")
             else:
                 try:
-                    # Conectar com a planilha
-                    aba_manutencao, _ = setup_gsheets()
+                    # Conectar com a planilha - MODIFICADO
+                    aba_manutencao = setup_gsheets()  # Agora retorna apenas uma aba
                     
                     # Preparar os dados para inserção (na ordem das colunas)
                     novo_registro = [
@@ -229,72 +216,6 @@ def inserir_dados_manutencao():
                     aba_manutencao.append_row(novo_registro)
                     
                     st.success("✅ Atividade salva na aba Manutenção com sucesso!")
-                    st.balloons()
-                    
-                    # Limpar cache para atualizar os dados
-                    st.cache_data.clear()
-                    
-                except Exception as e:
-                    st.error(f"❌ Erro ao salvar atividade: {e}")
-
-# Função para inserir dados na aba CONTROLADOR (SIMPLIFICADA)
-def inserir_dados_controlador():
-    st.subheader("🎯 Formulário - Aba Controlador")
-    
-    with st.form("form_controlador"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            atividade = st.text_input("Atividade*", placeholder="Descreva a atividade", key="atividade_controlador")
-            
-            # Campo Módulo com dropdown SIMPLES
-            modulo = criar_campo_dropdown("Módulo", obrigatorio=True, key_suffix="controlador")
-            
-            data_abertura = st.date_input("Data de Abertura*", datetime.now(), key="data_abertura_controlador")
-            
-        with col2:
-            # Campo Responsável com dropdown SIMPLES
-            responsavel = criar_campo_dropdown("Responsável", obrigatorio=True, key_suffix="controlador")
-            
-            data_entrega = st.date_input("Data de Entrega", datetime.now(), key="data_entrega_controlador")
-            pontos = st.number_input("Pontos*", min_value=0, max_value=100, value=1, step=1, key="pontos_controlador")
-        
-        observacoes = st.text_area("Observações", placeholder="Observações adicionais...", key="obs_controlador")
-        
-        submitted = st.form_submit_button("💾 Salvar na Aba Controlador", key="submit_controlador")
-        
-        if submitted:
-            # Validações
-            campos_obrigatorios = [
-                (atividade, "Atividade"),
-                (modulo, "Módulo"),
-                (responsavel, "Responsável")
-            ]
-            
-            campos_faltantes = [nome for campo, nome in campos_obrigatorios if not campo or campo == "Selecione..."]
-            
-            if campos_faltantes:
-                st.error(f"❌ Preencha todos os campos obrigatórios: {', '.join(campos_faltantes)}")
-            else:
-                try:
-                    # Conectar com a planilha
-                    _, aba_controlador = setup_gsheets()
-                    
-                    # Preparar os dados para inserção (na ordem das colunas do Controlador)
-                    novo_registro = [
-                        len(aba_controlador.get_all_records()) + 1,  # ID automático
-                        atividade,
-                        modulo,
-                        data_abertura.strftime("%Y-%m-%d"),
-                        data_entrega.strftime("%Y-%m-%d") if data_entrega else "",
-                        responsavel,
-                        pontos
-                    ]
-                    
-                    # Inserir na planilha
-                    aba_controlador.append_row(novo_registro)
-                    
-                    st.success("✅ Atividade salva na aba Controlador com sucesso!")
                     st.balloons()
                     
                     # Limpar cache para atualizar os dados
@@ -372,7 +293,7 @@ pagina = st.sidebar.radio(
 # SISTEMA DO ASSISTENTE IA PARA PRODUTIVIDADE - VERSÃO MELHORADA
 # =============================================================================
 
-def show_assistente_produtividade_ia(df_manutencao_filtrado, df_controlador_filtrado, gemini_key=None):
+def show_assistente_produtividade_ia(df_manutencao_filtrado, gemini_key=None):
     """Exibe a interface do assistente de IA para análise de produtividade - VERSÃO MELHORADA"""
     
     st.header("🤖 Assistente de IA - Análise de Produtividade")
@@ -479,7 +400,7 @@ def show_assistente_produtividade_ia(df_manutencao_filtrado, df_controlador_filt
     if st.button("✨ Gerar Insights Automáticos", use_container_width=True):
         try:
             from assistente_produtividade import gerar_insights_automaticos
-            insights = gerar_insights_automaticos(df_manutencao_filtrado, df_controlador_filtrado)
+            insights = gerar_insights_automaticos(df_manutencao_filtrado, pd.DataFrame())
             st.session_state.produtividade_current_question = "Com base nos insights automáticos gerados, forneça uma análise detalhada e recomendações específicas."
             # Armazenar insights para uso na consulta
             st.session_state.insights_automaticos = insights
@@ -549,15 +470,14 @@ def show_assistente_produtividade_ia(df_manutencao_filtrado, df_controlador_filt
                         from assistente_produtividade import consultar_assistente_produtividade
                     except ImportError as e:
                         # Fallback local
-                        def consultar_assistente_produtividade_fallback(pergunta, df_manutencao, df_controlador, tipo_modelo, gemini_key):
-                            return f"❌ Módulo do assistente não disponível. Erro: {e}\n\n📊 **Análise Local:**\n- Manutenção: {len(df_manutencao)} registros\n- Controlador: {len(df_controlador)} registros"
+                        def consultar_assistente_produtividade_fallback(pergunta, df_manutencao, tipo_modelo, gemini_key):
+                            return f"❌ Módulo do assistente não disponível. Erro: {e}\n\n📊 **Análise Local:**\n- Manutenção: {len(df_manutencao)} registros"
                         consultar_assistente_produtividade = consultar_assistente_produtividade_fallback
                     
                     # Executar consulta
                     resposta = consultar_assistente_produtividade(
                         pergunta=st.session_state.produtividade_pending_question,
                         df_manutencao=df_manutencao_filtrado,
-                        df_controlador=df_controlador_filtrado,
                         tipo_modelo=st.session_state.produtividade_pending_model,
                         gemini_key=gemini_key
                     )
@@ -568,8 +488,7 @@ def show_assistente_produtividade_ia(df_manutencao_filtrado, df_controlador_filt
                         'resposta': resposta,
                         'modelo': st.session_state.produtividade_pending_model,
                         'timestamp': datetime.now().strftime('%d/%m/%Y %H:%M'),
-                        'registros_manutencao': len(df_manutencao_filtrado),
-                        'registros_controlador': len(df_controlador_filtrado)
+                        'registros_manutencao': len(df_manutencao_filtrado)
                     }
                     
                     st.session_state.produtividade_assistant_responses.append(nova_resposta)
@@ -604,7 +523,6 @@ def show_assistente_produtividade_ia(df_manutencao_filtrado, df_controlador_filt
             with st.expander("ℹ️ Informações do contexto"):
                 st.write(f"**Modelo usado:** {selected_model}")
                 st.write(f"**Registros Manutenção analisados:** {len(df_manutencao_filtrado)}")
-                st.write(f"**Registros Controlador analisados:** {len(df_controlador_filtrado)}")
                 
                 # Estatísticas rápidas
                 if not df_manutencao_filtrado.empty:
@@ -630,7 +548,7 @@ def show_assistente_produtividade_ia(df_manutencao_filtrado, df_controlador_filt
                     st.write(f"**Pergunta:** {resp['pergunta']}")
                     st.markdown("**Resposta:**")
                     st.markdown(resp['resposta'])
-                    st.caption(f"Modelo: {resp['modelo']} | Manutenção: {resp['registros_manutencao']} | Controlador: {resp['registros_controlador']} | {resp['timestamp']}")
+                    st.caption(f"Modelo: {resp['modelo']} | Manutenção: {resp['registros_manutencao']} | {resp['timestamp']}")
 
 
 # =============================================================================
@@ -668,28 +586,21 @@ if pagina == "📊 Dashboard":
         
         # Conecta com a planilha "Produtividade"
         planilha = client.open("Produtividade")
-        
-        # Acessa as abas específicas
         aba_manutencao = planilha.worksheet("Manutenção")  # Sua aba principal
-        aba_controlador = planilha.worksheet("Controlador")  # Sua aba controlador
-        
-        return aba_manutencao, aba_controlador
+                
+        return aba_manutencao
 
     # Carregar dados do Google Sheets 
-    @st.cache_data(ttl=300)  # Cache de 5 minutos
+    @st.cache_data(ttl=300)
     def load_data_from_google_sheets():
         try:
-            # Conectar com as abas
-            aba_manutencao, aba_controlador = setup_gsheets()
+            # Conectar com a aba (apenas Manutenção)
+            aba_manutencao = setup_gsheets()
             
             # Carregar dados da ABA MANUTENÇÃO (sua aba principal)
             dados_manutencao = aba_manutencao.get_all_records()
             df_principal = pd.DataFrame(dados_manutencao)
-            
-            # Carregar dados da ABA CONTROLADOR
-            dados_controlador = aba_controlador.get_all_records()
-            df_controlador = pd.DataFrame(dados_controlador)
-            
+        
             # Limpeza dos dados PRINCIPAIS - trata valores NaN
             # USANDO OS NOMES CORRETOS DA SUA PLANILHA
             if 'Responsável' in df_principal.columns:
@@ -698,11 +609,11 @@ if pagina == "📊 Dashboard":
                 df_principal['Módulo'] = df_principal['Módulo'].fillna('Sem Módulo')
             if 'Status' in df_principal.columns:
                 df_principal['Status'] = df_principal['Status'].fillna('Sem Status')
-            if 'Falha / Teste em Produção' in df_principal.columns:  # NOME CORRETO!
+            if 'Falha / Teste em Produção' in df_principal.columns:
                 df_principal['Falha / Teste em Produção'] = df_principal['Falha / Teste em Produção'].fillna('Não')
 
             # Converte para string (se as colunas existirem)
-            colunas_string = ['Responsável', 'Módulo', 'Status', 'Falha / Teste em Produção']  # NOME CORRETO!
+            colunas_string = ['Responsável', 'Módulo', 'Status', 'Falha / Teste em Produção']
             for coluna in colunas_string:
                 if coluna in df_principal.columns:
                     df_principal[coluna] = df_principal[coluna].astype(str)
@@ -717,32 +628,32 @@ if pagina == "📊 Dashboard":
             if all(col in df_principal.columns for col in ['Data Abertura', 'Data Entrega']):
                 mask = df_principal['Data Abertura'].notna() & df_principal['Data Entrega'].notna()
                 df_principal.loc[mask, 'Tempo Entrega (dias)'] = (df_principal.loc[mask, 'Data Entrega'] - df_principal.loc[mask, 'Data Abertura']).dt.days
-                
+            
                 # Para datas inválidas, definir como NaN
                 df_principal.loc[~mask, 'Tempo Entrega (dias)'] = np.nan
-                
+            
                 # Classificar se cumpriu o prazo (apenas atividades concluídas)
                 df_principal['Cumpriu Prazo'] = 'Não Concluída'
                 mask_concluidas = (df_principal['Status'] == 'Concluída') & df_principal['Tempo Entrega (dias)'].notna()
                 df_principal.loc[mask_concluidas, 'Cumpriu Prazo'] = df_principal.loc[mask_concluidas, 'Tempo Entrega (dias)'].apply(
                     lambda x: 'Dentro do Prazo' if x <= PRAZO_GESTAO else 'Fora do Prazo'
                 )
-            
-            # Limpeza básica dos dados do CONTROLADOR
-            df_controlador = df_controlador.fillna('')
-            
+        
             st.success("✅ Dados carregados do Google Sheets com sucesso!")
-            return df_principal, df_controlador
-            
+            return df_principal  # Retorna apenas um DataFrame
+        
         except Exception as e:
             st.error(f"❌ Erro ao carregar dados do Google Sheets: {e}")
-            return None, None
+            return None
 
     # Carregar dados
-    df, df_controlador = load_data_from_google_sheets()
+    df = load_data_from_google_sheets()
 
     if df is None:
         st.stop()
+
+    # DataFrame vazio para compatibilidade
+    df_controlador = pd.DataFrame()
 
     # Sidebar - Filtros e informações
     st.sidebar.title("🔧 Filtros")
@@ -976,13 +887,12 @@ if pagina == "📊 Dashboard":
     """, unsafe_allow_html=True)
 
     # Abas principais
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
          "📈 Visão Geral", 
         "👥 Por Responsável", 
         "🔧 Por Módulo", 
         "📅 Timeline", 
         "⏰ Análise de Prazos",
-        "🎛️ Controlador",  
         "💡 Insights",
         "🚨 Alertas",
         "🤖 Assistente IA"      
@@ -1384,180 +1294,6 @@ if pagina == "📊 Dashboard":
                     """, unsafe_allow_html=True)
 
     with tab6:
-        st.subheader("🎛️ Análise da Aba Controlador")
-        
-        if df_controlador is not None:
-            # Limpeza e preparação dos dados do Controlador
-            df_controlador_clean = df_controlador.copy()
-            
-            # Preencher valores vazios
-            df_controlador_clean['Responsável'] = df_controlador_clean['Responsável'].fillna('Sem Responsável')
-            df_controlador_clean['Módulo'] = df_controlador_clean['Módulo'].fillna('Sem Módulo')
-            df_controlador_clean['Pontos'] = pd.to_numeric(df_controlador_clean['Pontos'], errors='coerce').fillna(0)
-            
-            # Converter datas
-            df_controlador_clean['Data Abertura'] = pd.to_datetime(df_controlador_clean['Data Abertura'], errors='coerce')
-            df_controlador_clean['Data Entrega'] = pd.to_datetime(df_controlador_clean['Data Entrega'], errors='coerce')
-            
-            # Calcular tempo de entrega
-            mask = df_controlador_clean['Data Abertura'].notna() & df_controlador_clean['Data Entrega'].notna()
-            df_controlador_clean.loc[mask, 'Tempo Entrega (dias)'] = (df_controlador_clean.loc[mask, 'Data Entrega'] - df_controlador_clean.loc[mask, 'Data Abertura']).dt.days
-            
-            # VISUALIZAÇÃO DOS DADOS COM LUPA EXPANSÍVEL
-            st.markdown("### 📋 Visualização dos Dados")
-            
-            # Criar colunas para o cabeçalho com lupa
-            col_header1, col_header2 = st.columns([3, 1])
-            
-            with col_header1:
-                st.write(f"**Total de demandas:** {len(df_controlador_clean)}")
-            
-            with col_header2:
-                # Botão de lupa para expandir/recolher
-                expandir_tabela = st.button("🔍 Expandir Tabela", key="expandir_controlador")
-            
-            # Mostrar tabela compacta ou expandida
-            if expandir_tabela:
-                st.dataframe(df_controlador_clean, use_container_width=True, height=400)
-                st.button("↸ Recolher Tabela", key="recolher_controlador")
-            else:
-                # Mostrar apenas as primeiras linhas
-                st.dataframe(df_controlador_clean.head(8), use_container_width=True)
-                if len(df_controlador_clean) > 8:
-                    st.caption(f"Mostrando 8 de {len(df_controlador_clean)} registros. Use o botão 🔍 para ver todos.")
-            
-            # ESTATÍSTICAS PRINCIPAIS
-            st.markdown("### 📊 Estatísticas do Controlador")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                total_demandas = len(df_controlador_clean)
-                st.metric("Total de Demandas", total_demandas)
-            
-            with col2:
-                total_pontos = df_controlador_clean['Pontos'].sum()
-                st.metric("Total de Pontos", f"{total_pontos:.0f}")
-            
-            with col3:
-                demanda_media_pontos = df_controlador_clean['Pontos'].mean()
-                st.metric("Média de Pontos/Demanda", f"{demanda_media_pontos:.1f}")
-            
-            with col4:
-                responsaveis_ativos = df_controlador_clean['Responsável'].nunique()
-                st.metric("Responsáveis Ativos", responsaveis_ativos)
-            
-            # ANÁLISE DE PONTOS (DIFICULDADE)
-            st.markdown("### 🎯 Análise de Dificuldade (Pontos)")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Distribuição de pontos
-                st.markdown("#### 📈 Distribuição de Pontos por Demanda")
-                fig_pontos = px.histogram(df_controlador_clean, x='Pontos', 
-                                        title='Distribuição de Pontos (Dificuldade)',
-                                        nbins=10,
-                                        color_discrete_sequence=['#FF6B6B'])
-                st.plotly_chart(fig_pontos, use_container_width=True)
-            
-            with col2:
-                # Top demandas mais difíceis
-                st.markdown("#### 🏆 Top 5 Demandas Mais Complexas")
-                top_dificil = df_controlador_clean.nlargest(5, 'Pontos')[['ID', 'Atividade', 'Pontos', 'Responsável']]
-                for idx, demanda in top_dificil.iterrows():
-                    st.markdown(f"""
-                    <div class="slow-activity">
-                        <strong>{demanda['Pontos']} pontos</strong><br>
-                        <strong>ID:</strong> {demanda['ID']} | <strong>Responsável:</strong> {demanda['Responsável']}<br>
-                        {demanda['Atividade'][:60]}...
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            # ANÁLISE POR RESPONSÁVEL
-            st.markdown("### 👤 Análise por Responsável")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Pontos por responsável
-                pontos_por_resp = df_controlador_clean.groupby('Responsável').agg({
-                    'ID': 'count',
-                    'Pontos': 'sum',
-                    'Tempo Entrega (dias)': 'mean'
-                }).round(1)
-                pontos_por_resp.columns = ['Total Demandas', 'Pontos Totais', 'Tempo Médio (dias)']
-                pontos_por_resp = pontos_por_resp.sort_values('Pontos Totais', ascending=False)
-                
-                st.markdown("#### 📊 Pontos por Responsável")
-                st.dataframe(pontos_por_resp, use_container_width=True)
-            
-            with col2:
-                # Gráfico de pontos por responsável
-                if not pontos_por_resp.empty:
-                    fig_pontos_resp = px.bar(pontos_por_resp.head(10), 
-                                           x=pontos_por_resp.head(10).index,
-                                           y='Pontos Totais',
-                                           title='Top 10 - Pontos por Responsável',
-                                           color='Pontos Totais',
-                                           color_continuous_scale='Viridis')
-                    fig_pontos_resp.update_layout(xaxis_tickangle=-45)
-                    st.plotly_chart(fig_pontos_resp, use_container_width=True)
-            
-            # ANÁLISE POR MÓDULO
-            st.markdown("### 🔧 Análise por Módulo")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Pontos por módulo
-                pontos_por_modulo = df_controlador_clean.groupby('Módulo').agg({
-                    'ID': 'count',
-                    'Pontos': 'sum'
-                }).round(1)
-                pontos_por_modulo.columns = ['Total Demandas', 'Pontos Totais']
-                pontos_por_modulo = pontos_por_modulo.sort_values('Pontos Totais', ascending=False)
-                
-                st.markdown("#### 📊 Módulos por Complexidade")
-                st.dataframe(pontos_por_modulo, use_container_width=True)
-            
-            with col2:
-                # Gráfico de pontos por módulo
-                if not pontos_por_modulo.empty:
-                    fig_pontos_mod = px.pie(pontos_por_modulo, 
-                                          values='Pontos Totais', 
-                                          names=pontos_por_modulo.index,
-                                          title='Distribuição de Pontos por Módulo')
-                    st.plotly_chart(fig_pontos_mod, use_container_width=True)
-            
-                    
-            # INSIGHTS ESPECÍFICOS DO CONTROLADOR
-            st.markdown("### 💡 Insights do Controlador")
-            
-            # Responsável com mais pontos (mais complexidade)
-            resp_mais_pontos = pontos_por_resp.nlargest(1, 'Pontos Totais')
-            if not resp_mais_pontos.empty:
-                resp, dados = list(resp_mais_pontos.iterrows())[0]
-                st.info(f"**🏆 Maior complexidade:** {resp} - {dados['Pontos Totais']} pontos totais")
-            
-            # Módulo mais complexo
-            modulo_mais_pontos = pontos_por_modulo.nlargest(1, 'Pontos Totais')
-            if not modulo_mais_pontos.empty:
-                mod, dados = list(modulo_mais_pontos.iterrows())[0]
-                st.info(f"**🔧 Módulo mais complexo:** {mod} - {dados['Pontos Totais']} pontos totais")
-            
-            # Demanda mais difícil
-            if not df_controlador_clean.empty:
-                demanda_mais_dificil = df_controlador_clean.nlargest(1, 'Pontos')
-                if not demanda_mais_dificil.empty:
-                    demanda = demanda_mais_dificil.iloc[0]
-                    st.warning(f"**🚨 Demanda mais complexa:** ID {demanda['ID']} - {demanda['Pontos']} pontos - {demanda['Responsável']}")
-        
-        else:
-            st.error("❌ Não foi possível carregar os dados do Controlador")             
-          
-
-    with tab7:
         st.subheader("💡 Análise de Rendimento")
     
         col1, col2 = st.columns(2)
@@ -1754,69 +1490,69 @@ if pagina == "📊 Dashboard":
         else:
             st.info("📊 Dados insuficientes para análise de performance")
 
-    with col2:
-        st.markdown("<h3 style='text-align: left;'>💡 Recomendações Ações</h3>", unsafe_allow_html=True)
+        with col2:
+            st.markdown("<h3 style='text-align: left;'>💡 Recomendações Ações</h3>", unsafe_allow_html=True)
 
-        recomendacoes = []
+            recomendacoes = []
 
-        if total_concluidas > 0:
-            # 🆕 RECOMENDAÇÕES ESPECÍFICAS PARA CASOS CRÍTICOS
-            if 'casos_especiais' in locals() and not casos_especiais.empty:
-                for _, caso in casos_especiais.iterrows():
-                    recomendacoes.append(f"**🚨 Ação Imediata:** {caso['Responsável']} precisa de mentoria urgente - 100% fora do prazo em {int(caso['Total'])} atividades")
-            
-            # Recomendações baseadas no ranking
-            if 'top5_fora_prazo' in locals() and not top5_fora_prazo.empty:
-                top1_fora_prazo = top5_fora_prazo.iloc[0]
-                recomendacoes.append(f"**🎯 Foco Prioritário:** {top5_fora_prazo.index[0]} lidera com {int(top1_fora_prazo['Qtd Fora Prazo'])} entregas fora do prazo")
-            
-            if taxa_fora_prazo > 40:
-                recomendacoes.append("**🔴 Revisão de Processos:** Analisar causas dos atrasos frequentes na equipe")
-            
-            if atividades_sem_responsavel > 0:
-                recomendacoes.append(f"**👥 Atribuição Pendente:** {atividades_sem_responsavel} atividades sem responsável definido")
-            
-            # Verificar responsáveis com baixa performance no prazo
-            if 'df_performance' in locals():
-                resp_baixa_performance = df_performance[
-                    (df_performance['Total'] >= 3) & 
-                    (df_performance['Dentro Prazo (%)'] < 50) &
-                    (df_performance['Dentro Prazo (%)'] > 0)  # Exclui os 0% já tratados
+            if total_concluidas > 0:
+                # 🆕 RECOMENDAÇÕES ESPECÍFICAS PARA CASOS CRÍTICOS
+                if 'casos_especiais' in locals() and not casos_especiais.empty:
+                    for _, caso in casos_especiais.iterrows():
+                        recomendacoes.append(f"**🚨 Ação Imediata:** {caso['Responsável']} precisa de mentoria urgente - 100% fora do prazo em {int(caso['Total'])} atividades")
+                
+                # Recomendações baseadas no ranking
+                if 'top5_fora_prazo' in locals() and not top5_fora_prazo.empty:
+                    top1_fora_prazo = top5_fora_prazo.iloc[0]
+                    recomendacoes.append(f"**🎯 Foco Prioritário:** {top5_fora_prazo.index[0]} lidera com {int(top1_fora_prazo['Qtd Fora Prazo'])} entregas fora do prazo")
+                
+                if taxa_fora_prazo > 40:
+                    recomendacoes.append("**🔴 Revisão de Processos:** Analisar causas dos atrasos frequentes na equipe")
+                
+                if atividades_sem_responsavel > 0:
+                    recomendacoes.append(f"**👥 Atribuição Pendente:** {atividades_sem_responsavel} atividades sem responsável definido")
+                
+                # Verificar responsáveis com baixa performance no prazo
+                if 'df_performance' in locals():
+                    resp_baixa_performance = df_performance[
+                        (df_performance['Total'] >= 3) & 
+                        (df_performance['Dentro Prazo (%)'] < 50) &
+                        (df_performance['Dentro Prazo (%)'] > 0)  # Exclui os 0% já tratados
+                    ]
+                    if not resp_baixa_performance.empty:
+                        for _, row in resp_baixa_performance.iterrows():
+                            recomendacoes.append(f"**📚 Capacitação:** {row['Responsável']} tem apenas {row['Dentro Prazo (%)']:.1f}% dentro do prazo")
+                
+                # Verificar módulos problemáticos
+                mod_problematicos = modulo_analysis[
+                    (modulo_analysis['Total'] >= 5) & 
+                    (modulo_analysis['Dentro Prazo (%)'] < 40)
                 ]
-                if not resp_baixa_performance.empty:
-                    for _, row in resp_baixa_performance.iterrows():
-                        recomendacoes.append(f"**📚 Capacitação:** {row['Responsável']} tem apenas {row['Dentro Prazo (%)']:.1f}% dentro do prazo")
+                if not mod_problematicos.empty:
+                    for mod, dados in mod_problematicos.iterrows():
+                        recomendacoes.append(f"**🔧 Otimização de Processo:** Módulo {mod} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
+                
+                # Análise de falhas
+                if atividades_com_falha_total > 0:
+                    recomendacoes.append(f"**🧪 Melhoria de Qualidade:** {atividades_com_falha_total} atividades tiveram falha - fortalecer testes")
+
+            if not recomendacoes:
+                recomendacoes.append("**✅ Manutenção:** Continue com os processos atuais - performance dentro do esperado")
+
+            # Exibir recomendações
+            for rec in recomendacoes:
+                st.markdown(f"• {rec}")
+
+            st.markdown("---")
+            st.markdown("#### 📈 Métricas Gerais")
             
-            # Verificar módulos problemáticos
-            mod_problematicos = modulo_analysis[
-                (modulo_analysis['Total'] >= 5) & 
-                (modulo_analysis['Dentro Prazo (%)'] < 40)
-            ]
-            if not mod_problematicos.empty:
-                for mod, dados in mod_problematicos.iterrows():
-                    recomendacoes.append(f"**🔧 Otimização de Processo:** Módulo {mod} tem apenas {dados['Dentro Prazo (%)']:.1f}% dentro do prazo")
-            
-            # Análise de falhas
-            if atividades_com_falha_total > 0:
-                recomendacoes.append(f"**🧪 Melhoria de Qualidade:** {atividades_com_falha_total} atividades tiveram falha - fortalecer testes")
-
-        if not recomendacoes:
-            recomendacoes.append("**✅ Manutenção:** Continue com os processos atuais - performance dentro do esperado")
-
-        # Exibir recomendações
-        for rec in recomendacoes:
-            st.markdown(f"• {rec}")
-
-        st.markdown("---")
-        st.markdown("#### 📈 Métricas Gerais")
-        
-        col_met1, col_met2, col_met3 = st.columns(3)
-        with col_met1:
-            st.metric("Taxa Fora do Prazo", f"{taxa_fora_prazo:.1f}%")
-        with col_met2:
-            st.metric("Atividades Concluídas", total_concluidas)
-        with col_met3:
-            st.metric("Sem Responsável", atividades_sem_responsavel)
+            col_met1, col_met2, col_met3 = st.columns(3)
+            with col_met1:
+                st.metric("Taxa Fora do Prazo", f"{taxa_fora_prazo:.1f}%")
+            with col_met2:
+                st.metric("Atividades Concluídas", total_concluidas)
+            with col_met3:
+                st.metric("Sem Responsável", atividades_sem_responsavel)
 
     # Rodapé
     st.markdown("---")
@@ -1824,7 +1560,7 @@ if pagina == "📊 Dashboard":
     st.markdown(f"📊 **Fonte de dados:** Google Sheets | ⏰ **Prazo estabelecido pela Gestão para entrega:** {PRAZO_GESTAO} dias (48h)")
 
 
-    with tab8:
+    with tab7:
         st.subheader("🚨 Alertas - Demandas em Aberto")
     
         st.markdown("""
@@ -2001,8 +1737,8 @@ if pagina == "📊 Dashboard":
     </style>
     """, unsafe_allow_html=True)
 
-    with tab9:  # NOVA ABA DO ASSISTENTE IA
-        show_assistente_produtividade_ia(df_filtrado, df_controlador, gemini_key=get_gemini_key())
+    with tab8:  # AGORA É tab8 (era tab9)
+        show_assistente_produtividade_ia(df_filtrado, gemini_key=get_gemini_key())
 
 
 else:  # Página "📝 Inserir Dados"
